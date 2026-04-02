@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
-import { LogIn } from 'lucide-react'
+import { LogIn, ArrowLeft } from 'lucide-react'
 import { Button, Input, TurnstileMock } from '@/shared/ui'
 import { useAuthStore } from '@/shared/model/authStore'
 import { apiClient } from '@/shared/api/client'
@@ -55,6 +55,13 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
+      <Link
+        to="/"
+        className="fixed top-5 left-5 flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back
+      </Link>
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary-600 text-white mb-4">
