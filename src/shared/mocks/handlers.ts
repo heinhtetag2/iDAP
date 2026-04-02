@@ -2,7 +2,7 @@ import { http, HttpResponse, delay } from 'msw'
 import { db, companyDb, adminDb } from './db'
 import type { MockSurvey, MockQuestion, MockSurveyHistoryItem } from './db'
 
-const API = import.meta.env.VITE_API_URL ?? 'https://api.idap.mn/api/v1'
+const API = import.meta.env.VITE_API_URL ?? '/api/v1'
 
 function ok<T>(data: T, meta?: Record<string, unknown>) {
   return HttpResponse.json({ success: true, data, meta: meta ?? null, error: null })

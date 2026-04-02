@@ -1,7 +1,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse } from './types'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://api.idap.mn/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -49,7 +49,9 @@ function setTokens(accessToken: string, refreshToken: string) {
 
 function clearTokens() {
   localStorage.removeItem('auth-storage')
-  window.location.href = '/login'
+  localStorage.removeItem('company-auth-storage')
+  localStorage.removeItem('admin-auth-storage')
+  window.location.href = '/'
 }
 
 // Request interceptor: attach access token
@@ -103,7 +105,7 @@ apiClient.interceptors.response.use(
         return Promise.reject(error)
       }
 
-      const { data } = await axios.post(`${API_BASE_URL}/auth/token/refresh`, {
+      const { data } = await apiClient.post(`/auth/token/refresh`, {
         refresh_token: state.refreshToken,
       })
 
