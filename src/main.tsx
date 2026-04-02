@@ -4,7 +4,6 @@ import App from './App.tsx'
 import '@/app/styles/globals.css'
 
 async function enableMocking() {
-  if (import.meta.env.PROD) return
   const { worker } = await import('@/shared/mocks/browser')
   return worker.start({
     onUnhandledRequest: 'bypass',
