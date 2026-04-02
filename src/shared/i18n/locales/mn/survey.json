@@ -1,0 +1,58 @@
+{
+  "feed": "Судалгааны жагсаалт",
+  "feedEmpty": "Одоогоор танд тохирох судалгаа байхгүй байна",
+  "feedEmptyAction": "Профайлаа бөглөж илүү олон судалгаанд хамрагдаарай",
+  "detail": "Судалгааны дэлгэрэнгүй",
+  "start": "Судалгаа эхлүүлэх",
+  "questions": "Асуулт",
+  "reward": "Шагнал",
+  "estimatedTime": "Хугацаа",
+  "remainingSpots": "Үлдсэн орон",
+  "matchScore": "Тохирох оноо",
+  "category": "Ангилал",
+  "completed": "Дууссан",
+  "inProgress": "Хийгдэж буй",
+  "pending": "Хүлээгдэж буй",
+  "invalidated": "Хүчингүй",
+  "rewardInstant": "Шагнал шууд олгогдоно",
+  "rewardHeld": "Шагнал 24 цагийн дараа олгогдоно",
+  "rewardInvalid": "Хариулт хүчингүй болсон",
+  "completeTitle": "Баяр хүргэе!",
+  "completeSubtitle": "Та судалгааг амжилттай бөглөлөө",
+  "earned": "Олсон шагнал",
+  "backToFeed": "Жагсаалт руу буцах",
+  "goToWallet": "Хэтэвч руу очих",
+  "confirmExit": "Судалгаанаас гарахдаа итгэлтэй байна уу?",
+  "confirmExitDesc": "Таны хариултууд хадгалагдахгүй",
+  "progressLabel": "Асуулт {{current}}/{{total}}",
+  "trustLevelRequired": "Итгэлцлийн түвшин {{level}} шаардлагатай",
+  "trustLevelHint": "Итгэлцлийн түвшнээ нэмэгдүүлэхийн тулд илүү олон судалгаа бөглөөрэй",
+  "profileRequired": "Профайл бөглөлт {{score}}% шаардлагатай",
+  "categories": {
+    "market_research": "Зах зээлийн судалгаа",
+    "brand": "Брэнд",
+    "product": "Бүтээгдэхүүн",
+    "hr": "Хүний нөөц",
+    "social": "Нийгмийн",
+    "other": "Бусад"
+  },
+  "history": "Миний судалгаанууд",
+  "historyEmpty": "Судалгааны түүх байхгүй байна",
+  "historyStatus": {
+    "completed": "Дууссан",
+    "pending_review": "Шалгаж байна",
+    "invalidated": "Хүчингүй"
+  },
+  "historyFilters": {
+    "all": "Бүгд",
+    "completed": "Дууссан",
+    "pending_review": "Шалгаж байна",
+    "invalidated": "Хүчингүй"
+  },
+  "sortOptions": {
+    "recommended": "Санал болгох",
+    "reward_high": "Шагнал өндөр",
+    "deadline": "Хугацаа дөхсөн",
+    "short": "Богино хугацаат"
+  }
+}

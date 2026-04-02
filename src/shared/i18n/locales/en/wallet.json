@@ -1,0 +1,32 @@
+{
+  "title": "Wallet",
+  "balance": "Balance",
+  "pendingBalance": "Pending",
+  "totalEarned": "Total Earned",
+  "totalWithdrawn": "Total Withdrawn",
+  "withdraw": "Withdraw",
+  "withdrawTitle": "Withdrawal Request",
+  "withdrawAmount": "Amount",
+  "withdrawMin": "Minimum: {{amount}}",
+  "withdrawBank": "Select bank",
+  "withdrawAccount": "Account number",
+  "withdrawProcessing": "Processing...",
+  "withdrawSuccess": "Withdrawal successful",
+  "withdrawFailed": "Withdrawal failed",
+  "withdrawAll": "Withdraw all",
+  "insufficientBalance": "Insufficient balance",
+  "transactions": "Transaction History",
+  "transactionTypes": {
+    "all": "All",
+    "earned": "Earned",
+    "pending": "Pending",
+    "released": "Released",
+    "withdrawn": "Withdrawn",
+    "refunded": "Refunded",
+    "deducted": "Deducted"
+  },
+  "noTransactions": "No transactions yet",
+  "withdrawAutoRefund": "Withdrawal failed. Your balance has been automatically refunded.",
+  "withdrawGateway": "Payment gateway",
+  "withdrawPhone": "Phone number"
+}

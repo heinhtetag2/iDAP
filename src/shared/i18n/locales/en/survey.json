@@ -1,0 +1,58 @@
+{
+  "feed": "Survey Feed",
+  "feedEmpty": "No matching surveys available right now",
+  "feedEmptyAction": "Complete your profile to unlock more surveys",
+  "detail": "Survey Details",
+  "start": "Start Survey",
+  "questions": "Questions",
+  "reward": "Reward",
+  "estimatedTime": "Est. Time",
+  "remainingSpots": "Spots left",
+  "matchScore": "Match Score",
+  "category": "Category",
+  "completed": "Completed",
+  "inProgress": "In Progress",
+  "pending": "Pending",
+  "invalidated": "Invalidated",
+  "rewardInstant": "Reward credited instantly",
+  "rewardHeld": "Reward will be credited in 24 hours",
+  "rewardInvalid": "Response was invalidated",
+  "completeTitle": "Congratulations!",
+  "completeSubtitle": "You have completed the survey",
+  "earned": "Reward earned",
+  "backToFeed": "Back to feed",
+  "goToWallet": "Go to wallet",
+  "confirmExit": "Are you sure you want to exit?",
+  "confirmExitDesc": "Your answers will not be saved",
+  "progressLabel": "Question {{current}} of {{total}}",
+  "trustLevelRequired": "Trust Level {{level}} required",
+  "trustLevelHint": "Complete more surveys to increase your trust level",
+  "profileRequired": "Profile completion of {{score}}% required",
+  "categories": {
+    "market_research": "Market Research",
+    "brand": "Brand",
+    "product": "Product",
+    "hr": "HR",
+    "social": "Social",
+    "other": "Other"
+  },
+  "history": "My Surveys",
+  "historyEmpty": "No survey history yet",
+  "historyStatus": {
+    "completed": "Completed",
+    "pending_review": "Under Review",
+    "invalidated": "Invalidated"
+  },
+  "historyFilters": {
+    "all": "All",
+    "completed": "Completed",
+    "pending_review": "Under Review",
+    "invalidated": "Invalidated"
+  },
+  "sortOptions": {
+    "recommended": "Recommended",
+    "reward_high": "Highest reward",
+    "deadline": "Ending soon",
+    "short": "Shortest"
+  }
+}

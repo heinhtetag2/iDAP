@@ -1,0 +1,32 @@
+{
+  "title": "Хэтэвч",
+  "balance": "Үлдэгдэл",
+  "pendingBalance": "Хүлээгдэж буй",
+  "totalEarned": "Нийт олсон",
+  "totalWithdrawn": "Нийт авсан",
+  "withdraw": "Мөнгө авах",
+  "withdrawTitle": "Мөнгө авах хүсэлт",
+  "withdrawAmount": "Дүн",
+  "withdrawMin": "Хамгийн бага: {{amount}}",
+  "withdrawBank": "Банк сонгох",
+  "withdrawAccount": "Дансны дугаар",
+  "withdrawProcessing": "Боловсруулж байна...",
+  "withdrawSuccess": "Мөнгө амжилттай шилжүүллээ",
+  "withdrawFailed": "Шилжүүлэг амжилтгүй боллоо",
+  "withdrawAll": "Бүгдийг авах",
+  "insufficientBalance": "Үлдэгдэл хүрэлцэхгүй байна",
+  "transactions": "Гүйлгээний түүх",
+  "transactionTypes": {
+    "all": "Бүгд",
+    "earned": "Олсон",
+    "pending": "Хүлээгдэж буй",
+    "released": "Олгосон",
+    "withdrawn": "Авсан",
+    "refunded": "Буцаагдсан",
+    "deducted": "Суутгагдсан"
+  },
+  "noTransactions": "Гүйлгээ байхгүй байна",
+  "withdrawAutoRefund": "Гүйлгээ амжилтгүй боллоо. Дүн автоматаар буцааллаа.",
+  "withdrawGateway": "Төлбөрийн систем",
+  "withdrawPhone": "Утасны дугаар"
+}

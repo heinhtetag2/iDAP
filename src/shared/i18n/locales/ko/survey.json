@@ -1,0 +1,58 @@
+{
+  "feed": "설문 피드",
+  "feedEmpty": "현재 일치하는 설문이 없습니다",
+  "feedEmptyAction": "프로필을 완성하면 더 많은 설문을 받을 수 있습니다",
+  "detail": "설문 상세",
+  "start": "설문 시작",
+  "questions": "질문",
+  "reward": "보상",
+  "estimatedTime": "예상 시간",
+  "remainingSpots": "남은 자리",
+  "matchScore": "매칭 점수",
+  "category": "카테고리",
+  "completed": "완료",
+  "inProgress": "진행 중",
+  "pending": "대기 중",
+  "invalidated": "무효",
+  "rewardInstant": "보상이 즉시 지급됩니다",
+  "rewardHeld": "보상이 24시간 후 지급됩니다",
+  "rewardInvalid": "응답이 무효 처리되었습니다",
+  "completeTitle": "축하합니다!",
+  "completeSubtitle": "설문을 완료했습니다",
+  "earned": "획득한 보상",
+  "backToFeed": "피드로 돌아가기",
+  "goToWallet": "지갑으로 이동",
+  "confirmExit": "정말 나가시겠습니까?",
+  "confirmExitDesc": "답변이 저장되지 않습니다",
+  "progressLabel": "질문 {{current}}/{{total}}",
+  "trustLevelRequired": "신뢰 등급 {{level}} 필요",
+  "trustLevelHint": "신뢰 등급을 높이려면 더 많은 설문을 완료하세요",
+  "profileRequired": "프로필 완성도 {{score}}% 필요",
+  "categories": {
+    "market_research": "시장 조사",
+    "brand": "브랜드",
+    "product": "제품",
+    "hr": "인사",
+    "social": "사회",
+    "other": "기타"
+  },
+  "history": "내 설문",
+  "historyEmpty": "설문 기록이 없습니다",
+  "historyStatus": {
+    "completed": "완료",
+    "pending_review": "검토 중",
+    "invalidated": "무효"
+  },
+  "historyFilters": {
+    "all": "전체",
+    "completed": "완료",
+    "pending_review": "검토 중",
+    "invalidated": "무효"
+  },
+  "sortOptions": {
+    "recommended": "추천순",
+    "reward_high": "보상 높은순",
+    "deadline": "마감 임박순",
+    "short": "소요시간 짧은순"
+  }
+}
