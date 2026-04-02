@@ -129,10 +129,6 @@ export default function CompanyLoginPage() {
               </button>
             </form>
 
-            <div className="mt-4 rounded-lg bg-white/5 border border-white/10 p-3">
-              <p className="text-xs text-indigo-300 font-medium mb-1">Demo credentials</p>
-              <p className="text-xs text-white/60">company@idap.mn / password123</p>
-            </div>
           </div>
 
           <p className="text-center text-sm text-indigo-400 mt-4">

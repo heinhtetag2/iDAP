@@ -102,11 +102,6 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      {/* Demo hint */}
-      <div className="rounded-lg bg-white/5 border border-white/10 px-4 py-3">
-        <p className="text-xs font-medium text-white/50 mb-1">Demo credentials</p>
-        <p className="text-xs text-white/40">any email / any password (min 6 chars)</p>
-      </div>
 
       <p className="text-center text-sm text-white/40">
         {t('noAccount')}{' '}
