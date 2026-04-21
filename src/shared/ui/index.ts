@@ -16,3 +16,6 @@ export {
   ModalClose,
 } from './modal'
 export { TurnstileMock } from './turnstile-mock'
+export { Tooltip } from './tooltip'
+export { Breadcrumb, type BreadcrumbItem } from './breadcrumb'
+export { SlidePanel } from './slide-panel'

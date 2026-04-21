@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Ban, CheckCircle2, Eye, Filter } from 'lucide-react'
+import { AlertTriangle, Ban, CheckCircle2, Filter } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '@/shared/lib'
+import { Tooltip, SlidePanel } from '@/shared/ui'
 import { apiClient } from '@/shared/api/client'
 import { ROUTES } from '@/shared/config/routes'
 import { formatDistanceToNow } from 'date-fns'
@@ -30,6 +31,13 @@ interface FraudStats {
 const SEVERITY_TABS = ['all', 'high', 'medium', 'low'] as const
 const STATUS_TABS = ['open', 'investigating', 'dismissed', 'banned'] as const
 
+const TRIGGER_DESCRIPTIONS: Record<string, string> = {
+  speed_click: 'Answered too fast — likely clicking through without reading.',
+  duplicate_ip: 'Multiple accounts detected from the same IP address.',
+  low_quality: 'Consistently low quality answers across multiple surveys.',
+  pattern_match: 'Answer patterns match known fraudulent behavior.',
+}
+
 function severityBadge(sev: string) {
   const map: Record<string, string> = {
     high: 'bg-red-100 text-red-700 border-red-200',
@@ -49,10 +57,101 @@ function statusBadge(status: string) {
   return cn('px-2 py-0.5 rounded-full text-xs font-medium border capitalize', map[status] ?? '')
 }
 
+function FraudPanel({
+  alert,
+  onAction,
+}: {
+  alert: FraudAlert
+  onAction: (id: string, action: 'investigate' | 'dismiss' | 'ban') => void
+}) {
+  return (
+    <div className="p-5 space-y-5">
+      {/* Header */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <span className={severityBadge(alert.severity)}>{alert.severity} severity</span>
+          <span className={statusBadge(alert.status)}>{alert.status}</span>
+        </div>
+        <p className="text-sm font-mono text-text-secondary bg-gray-50 rounded-lg px-3 py-2 border border-border">
+          {alert.trigger}
+        </p>
+        <p className="text-xs text-text-muted mt-2">
+          {TRIGGER_DESCRIPTIONS[alert.trigger] ?? 'Automated system flagged anomalous behavior.'}
+        </p>
+      </div>
+
+      {/* Details */}
+      <div className="rounded-xl border border-border p-4 bg-gray-50">
+        <p className="text-xs font-medium text-text-secondary mb-1">Alert details</p>
+        <p className="text-sm text-text-primary">{alert.details}</p>
+      </div>
+
+      {/* Linked entities */}
+      <div className="rounded-xl border border-border divide-y divide-border">
+        <div className="flex justify-between items-center px-4 py-3 text-sm">
+          <span className="text-text-muted">Respondent</span>
+          <Link
+            to={ROUTES.ADMIN_RESPONDENT_DETAIL(alert.respondent_id)}
+            onClick={(e) => e.stopPropagation()}
+            className="font-medium text-violet-600 hover:text-violet-700 transition-colors"
+          >
+            {alert.respondent_name}
+          </Link>
+        </div>
+        <div className="flex justify-between items-center px-4 py-3 text-sm">
+          <span className="text-text-muted">Survey</span>
+          <Link
+            to={ROUTES.ADMIN_SURVEY_DETAIL(alert.survey_id)}
+            onClick={(e) => e.stopPropagation()}
+            className="font-medium text-violet-600 hover:text-violet-700 transition-colors max-w-[180px] truncate text-right"
+          >
+            {alert.survey_title}
+          </Link>
+        </div>
+        <div className="flex justify-between items-center px-4 py-3 text-sm">
+          <span className="text-text-muted">Detected</span>
+          <span className="font-medium text-text-primary">
+            {formatDistanceToNow(new Date(alert.detected_at), { addSuffix: true })}
+          </span>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-col gap-2">
+        {alert.status === 'open' && (
+          <button
+            onClick={() => onAction(alert.id, 'investigate')}
+            className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 py-2 text-sm font-semibold text-white transition-colors"
+          >
+            Mark as investigating
+          </button>
+        )}
+        {(alert.status === 'open' || alert.status === 'investigating') && (
+          <>
+            <button
+              onClick={() => onAction(alert.id, 'ban')}
+              className="w-full rounded-xl bg-red-600 hover:bg-red-700 py-2 text-sm font-semibold text-white transition-colors flex items-center justify-center gap-2"
+            >
+              <Ban className="h-4 w-4" /> Ban respondent
+            </button>
+            <button
+              onClick={() => onAction(alert.id, 'dismiss')}
+              className="w-full rounded-xl border border-border hover:bg-gray-50 py-2 text-sm font-medium text-text-secondary transition-colors"
+            >
+              Dismiss (false positive)
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function AdminFraudPage() {
   const queryClient = useQueryClient()
   const [severityFilter, setSeverityFilter] = useState<typeof SEVERITY_TABS[number]>('all')
   const [statusFilter, setStatusFilter] = useState<typeof STATUS_TABS[number]>('open')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const { data: alerts = [], isLoading } = useQuery<FraudAlert[]>({
     queryKey: ['admin', 'fraud', severityFilter, statusFilter],
@@ -80,8 +179,10 @@ export default function AdminFraudPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'fraud'] }),
   })
 
+  const selected = alerts.find((a) => a.id === selectedId) ?? null
+
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 w-full">
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Fraud Queue</h1>
         <p className="text-sm text-text-secondary mt-0.5">Automated fraud detection alerts requiring review</p>
@@ -90,10 +191,10 @@ export default function AdminFraudPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { icon: AlertTriangle, label: 'Open Alerts', value: stats?.open_alerts ?? '—', color: 'bg-red-500', highlight: true },
-          { icon: AlertTriangle, label: 'High Severity', value: stats?.high_severity ?? '—', color: 'bg-orange-500', highlight: false },
-          { icon: Ban, label: 'Banned Today', value: stats?.banned_today ?? '—', color: 'bg-violet-600', highlight: false },
-          { icon: CheckCircle2, label: 'Dismissed Today', value: stats?.dismissed_today ?? '—', color: 'bg-success-600', highlight: false },
+          { icon: AlertTriangle, label: 'Open Alerts',     value: stats?.open_alerts ?? '—',     color: 'bg-red-500',     highlight: true },
+          { icon: AlertTriangle, label: 'High Severity',   value: stats?.high_severity ?? '—',   color: 'bg-orange-500',  highlight: false },
+          { icon: Ban,           label: 'Banned Today',    value: stats?.banned_today ?? '—',    color: 'bg-violet-600',  highlight: false },
+          { icon: CheckCircle2,  label: 'Dismissed Today', value: stats?.dismissed_today ?? '—', color: 'bg-success-600', highlight: false },
         ].map((s) => (
           <div key={s.label} className={cn('rounded-xl border bg-white p-5', s.highlight && (stats?.open_alerts ?? 0) > 0 ? 'border-red-200 bg-red-50' : 'border-border')}>
             <div className={cn('flex h-9 w-9 items-center justify-center rounded-lg mb-3', s.color)}>
@@ -152,41 +253,67 @@ export default function AdminFraudPage() {
                 </tr>
               ))}
               {!isLoading && alerts.map((a) => (
-                <tr key={a.id} className={cn('border-b border-border hover:bg-gray-50 transition-colors', a.severity === 'high' && 'bg-red-50/30')}>
+                <tr
+                  key={a.id}
+                  onClick={() => setSelectedId(a.id)}
+                  className={cn(
+                    'border-b border-border hover:bg-gray-50 transition-colors cursor-pointer',
+                    a.severity === 'high' && selectedId !== a.id && 'bg-red-50/30',
+                    selectedId === a.id && 'bg-violet-50'
+                  )}
+                >
                   <td className="px-5 py-4">
-                    <Link to={ROUTES.ADMIN_FRAUD_DETAIL(a.id)} className="text-sm font-medium text-text-primary hover:text-violet-600 transition-colors">{a.respondent_name}</Link>
+                    <p className="text-sm font-medium text-text-primary">{a.respondent_name}</p>
                     <p className="text-xs text-text-muted">{a.details}</p>
                   </td>
                   <td className="px-4 py-4 text-sm text-text-secondary max-w-[160px] truncate">{a.survey_title}</td>
                   <td className="px-4 py-4">
-                    <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-text-secondary font-mono">
-                      {a.trigger}
-                    </span>
+                    <Tooltip
+                      content={TRIGGER_DESCRIPTIONS[a.trigger] ?? 'Automated system flagged anomalous behavior.'}
+                      position="bottom"
+                    >
+                      <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-text-secondary font-mono cursor-default">
+                        {a.trigger}
+                      </span>
+                    </Tooltip>
                   </td>
-                  <td className="px-4 py-4"><span className={severityBadge(a.severity)}>{a.severity}</span></td>
+                  <td className="px-4 py-4">
+                    <Tooltip content={
+                      a.severity === 'high' ? 'High — immediate action required. Strong evidence of fraud.' :
+                      a.severity === 'medium' ? 'Medium — review recommended. Suspicious but not confirmed.' :
+                      'Low — minor anomaly. Monitor but likely not fraud.'
+                    } position="bottom">
+                      <span className={severityBadge(a.severity)}>{a.severity}</span>
+                    </Tooltip>
+                  </td>
                   <td className="px-4 py-4"><span className={statusBadge(a.status)}>{a.status}</span></td>
                   <td className="px-4 py-4 text-xs text-text-muted">
                     {formatDistanceToNow(new Date(a.detected_at), { addSuffix: true })}
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
-                      {(a.status === 'open') && (
-                        <button onClick={() => actionMutation.mutate({ id: a.id, action: 'investigate' })}
-                          title="Start investigating"
-                          className="rounded-lg bg-blue-600 hover:bg-blue-700 px-2.5 py-1 text-xs font-medium text-white transition-colors">
-                          Investigate
-                        </button>
+                      {a.status === 'open' && (
+                        <Tooltip content="Mark as under investigation — flags this alert for deeper review." position="bottom">
+                          <button onClick={() => actionMutation.mutate({ id: a.id, action: 'investigate' })}
+                            className="rounded-lg bg-blue-600 hover:bg-blue-700 px-2.5 py-1 text-xs font-medium text-white transition-colors">
+                            Investigate
+                          </button>
+                        </Tooltip>
                       )}
                       {(a.status === 'open' || a.status === 'investigating') && (
                         <>
-                          <button onClick={() => actionMutation.mutate({ id: a.id, action: 'ban' })}
-                            className="rounded-lg bg-red-600 hover:bg-red-700 px-2.5 py-1 text-xs font-medium text-white transition-colors flex items-center gap-1">
-                            <Ban className="h-3 w-3" /> Ban
-                          </button>
-                          <button onClick={() => actionMutation.mutate({ id: a.id, action: 'dismiss' })}
-                            className="rounded-lg border border-border hover:bg-gray-50 px-2.5 py-1 text-xs font-medium text-text-secondary transition-colors">
-                            Dismiss
-                          </button>
+                          <Tooltip content="Permanently ban this respondent from the platform." position="bottom">
+                            <button onClick={() => actionMutation.mutate({ id: a.id, action: 'ban' })}
+                              className="rounded-lg bg-red-600 hover:bg-red-700 px-2.5 py-1 text-xs font-medium text-white transition-colors flex items-center gap-1">
+                              <Ban className="h-3 w-3" /> Ban
+                            </button>
+                          </Tooltip>
+                          <Tooltip content="Dismiss this alert — mark as a false positive, no action taken." position="bottom">
+                            <button onClick={() => actionMutation.mutate({ id: a.id, action: 'dismiss' })}
+                              className="rounded-lg border border-border hover:bg-gray-50 px-2.5 py-1 text-xs font-medium text-text-secondary transition-colors">
+                              Dismiss
+                            </button>
+                          </Tooltip>
                         </>
                       )}
                     </div>
@@ -205,6 +332,21 @@ export default function AdminFraudPage() {
           </table>
         </div>
       </div>
+
+      {selected && (
+        <SlidePanel
+          isOpen={!!selectedId}
+          onClose={() => setSelectedId(null)}
+          title={selected.respondent_name}
+          subtitle={<span className={severityBadge(selected.severity)}>{selected.severity} severity</span>}
+          fullPageHref={ROUTES.ADMIN_FRAUD_DETAIL(selected.id)}
+        >
+          <FraudPanel
+            alert={selected}
+            onAction={(id, action) => { actionMutation.mutate({ id, action }) }}
+          />
+        </SlidePanel>
+      )}
     </div>
   )
 }

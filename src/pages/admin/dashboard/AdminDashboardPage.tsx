@@ -69,19 +69,23 @@ function StatCard({
 function TinyBarChart({ data, color }: { data: { day: string; count?: number; amount?: number }[]; color: string }) {
   const vals = data.map((d) => d.count ?? d.amount ?? 0)
   const max = Math.max(...vals, 1)
+  const CHART_H = 120
   return (
-    <div className="flex items-end gap-1 h-14">
-      {data.map((d, i) => {
-        const val = d.count ?? d.amount ?? 0
-        return (
-          <div key={i} className="flex-1 flex flex-col items-center">
-            <div
-              className={cn('w-full rounded-t transition-all', color)}
-              style={{ height: `${Math.max((val / max) * 100, 4)}%` }}
-            />
-          </div>
-        )
-      })}
+    <div>
+      <div className="flex items-end gap-1.5" style={{ height: `${CHART_H}px` }}>
+        {data.map((d, i) => {
+          const val = d.count ?? d.amount ?? 0
+          const barH = Math.max((val / max) * CHART_H, 4)
+          return (
+            <div key={i} className={cn('flex-1 rounded-t', color)} style={{ height: `${barH}px` }} />
+          )
+        })}
+      </div>
+      <div className="flex gap-1.5 mt-2">
+        {data.map((d, i) => (
+          <span key={i} className="flex-1 text-center text-[10px] text-text-muted">{d.day}</span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -121,7 +125,7 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 w-full">
       {/* Welcome */}
       <div>
         <h1 className="text-2xl font-bold text-text-primary">
@@ -153,7 +157,7 @@ export default function AdminDashboardPage() {
       ) : null}
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-6">
         <StatCard icon={Users} label="Total Respondents" value={stats?.total_respondents.toLocaleString() ?? '—'}
           sub="All time" color="bg-primary-600" to={ROUTES.ADMIN_RESPONDENTS} />
         <StatCard icon={Building2} label="Active Companies" value={stats?.active_companies ?? '—'}
@@ -164,7 +168,7 @@ export default function AdminDashboardPage() {
           sub="Awaiting release" color="bg-warning-600" to={ROUTES.ADMIN_PAYOUTS} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 xl:gap-8">
         {/* Charts */}
         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="rounded-xl border border-border bg-white p-5">

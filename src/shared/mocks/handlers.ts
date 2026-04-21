@@ -259,16 +259,56 @@ export const handlers = [
     if (!survey) return err('NOT_FOUND', 'Survey not found', 404)
 
     const qualityScore = 70 + Math.floor(Math.random() * 30) // 70-99
-    const isInstant = qualityScore >= 80
-    const rewardAmount = isInstant ? survey.reward_amount : 0
 
+    // ── Quality multiplier (spec §1.3.5) ─────────────
+    let qualityMultiplier = 1.0
+    if (qualityScore >= 90) qualityMultiplier = 1.2
+    else if (qualityScore >= 85) qualityMultiplier = 1.1
+    else if (qualityScore >= 80) qualityMultiplier = 1.0
+    else if (qualityScore >= 75) qualityMultiplier = 0.9
+    else qualityMultiplier = 0.8
+
+    const adjustedReward = Math.round(survey.reward_amount * qualityMultiplier)
+    const isInstant = qualityScore >= 80
+
+    // ── Warning rules (spec §1.3.5) ──────────────────
+    if (qualityScore < 20) {
+      db.user.warning_count += 2 // suspend flag simulation
+    } else if (qualityScore < 50) {
+      db.user.warning_count += 1
+    }
+
+    // ── Update rolling avg quality & response count ──
+    const prevCount = db.user.responses_count
+    const prevAvg = db.user.avg_quality_score
+    db.user.responses_count = prevCount + 1
+    db.user.avg_quality_score = Math.round((prevAvg * prevCount + qualityScore) / (prevCount + 1))
+
+    // ── Auto trust level upgrade (spec §1.3.4) ───────
+    const TRUST_THRESHOLDS: Record<number, { min_responses: number; min_quality: number }> = {
+      1: { min_responses: 5, min_quality: 70 },
+      2: { min_responses: 20, min_quality: 75 },
+      3: { min_responses: 50, min_quality: 80 },
+      4: { min_responses: 100, min_quality: 85 },
+    }
+    const currentLevel = db.user.trust_level
+    const threshold = TRUST_THRESHOLDS[currentLevel]
+    let levelUpgraded = false
+    if (threshold && currentLevel < 5 &&
+        db.user.responses_count >= threshold.min_responses &&
+        db.user.avg_quality_score >= threshold.min_quality) {
+      db.user.trust_level = currentLevel + 1
+      levelUpgraded = true
+    }
+
+    // ── Wallet ───────────────────────────────────────
     if (isInstant && survey.reward_amount > 0) {
-      db.wallet.balance += survey.reward_amount
-      db.wallet.total_earned += survey.reward_amount
+      db.wallet.balance += adjustedReward
+      db.wallet.total_earned += adjustedReward
       db.transactions.unshift({
         id: 'tx-' + Date.now(),
         type: 'earned',
-        amount: survey.reward_amount,
+        amount: adjustedReward,
         balance_after: db.wallet.balance,
         note: `${survey.title} — шагнал`,
         note_en: `${survey.title_en} — reward`,
@@ -276,7 +316,7 @@ export const handlers = [
         created_at: new Date().toISOString(),
       })
     } else if (qualityScore >= 50 && survey.reward_amount > 0) {
-      db.wallet.pending_balance += survey.reward_amount
+      db.wallet.pending_balance += adjustedReward
     }
 
     survey.current_responses++
@@ -290,7 +330,7 @@ export const handlers = [
       survey_title_en: survey.title_en,
       survey_title_ko: survey.title_ko,
       status: historyStatus,
-      reward_amount: survey.reward_amount,
+      reward_amount: adjustedReward,
       reward_status: isInstant ? 'granted' : qualityScore >= 50 ? 'pending' : 'invalidated',
       completed_at: new Date().toISOString(),
     } as MockSurveyHistoryItem)
@@ -299,11 +339,40 @@ export const handlers = [
       response_id: 'resp-' + Date.now(),
       status: isInstant ? 'completed' : qualityScore >= 50 ? 'pending_review' : 'invalidated',
       quality_score: qualityScore,
+      quality_multiplier: qualityMultiplier,
+      level_upgraded: levelUpgraded,
+      new_trust_level: db.user.trust_level,
       reward: {
-        amount: survey.reward_amount,
+        amount: adjustedReward,
+        base_amount: survey.reward_amount,
         status: isInstant ? 'granted' : qualityScore >= 50 ? 'pending' : 'invalidated',
         wallet_balance_after: db.wallet.balance,
       },
+    })
+  }),
+
+  // ── Trust Status ─────────────────────────────────
+
+  http.get(`${API}/respondent/trust-status`, async () => {
+    await delay(200)
+    const TRUST_THRESHOLDS: Record<number, { min_responses: number; min_quality: number; label: string; color: string }> = {
+      1: { min_responses: 5, min_quality: 70, label: 'New', color: 'gray' },
+      2: { min_responses: 20, min_quality: 75, label: 'Verified', color: 'blue' },
+      3: { min_responses: 50, min_quality: 80, label: 'Trusted', color: 'green' },
+      4: { min_responses: 100, min_quality: 85, label: 'Premium', color: 'violet' },
+      5: { min_responses: 9999, min_quality: 99, label: 'Partner', color: 'amber' },
+    }
+    const currentLevel = db.user.trust_level
+    const nextThreshold = TRUST_THRESHOLDS[currentLevel]
+    return ok({
+      trust_level: currentLevel,
+      trust_label: TRUST_THRESHOLDS[currentLevel]?.label ?? 'New',
+      responses_count: db.user.responses_count,
+      avg_quality_score: db.user.avg_quality_score,
+      warning_count: db.user.warning_count,
+      next_level: currentLevel < 5 ? currentLevel + 1 : null,
+      next_level_label: currentLevel < 5 ? TRUST_THRESHOLDS[currentLevel + 1]?.label : null,
+      next_threshold: nextThreshold ?? null,
     })
   }),
 
@@ -485,6 +554,62 @@ export const handlers = [
     return ok(responses)
   }),
 
+  http.get(`${API}/company/surveys/:surveyId/responses/:responseId`, async ({ params }) => {
+    await delay(200)
+    const { surveyId, responseId } = params as { surveyId: string; responseId: string }
+    const idx = parseInt(responseId.split('-').pop() ?? '0', 10)
+    const MN_NAMES = ['Батаа', 'Мөнхбат', 'Оюунбаяр', 'Дулмаа', 'Энхтүвшин', 'Ганбаатар', 'Номин', 'Нарандэлгэр']
+    const qualities: Array<'high' | 'medium' | 'low'> = ['high', 'high', 'medium', 'low']
+    const statuses: Array<'earned' | 'pending' | 'invalidated'> = ['earned', 'earned', 'pending', 'invalidated']
+    const quality = qualities[idx % qualities.length]!
+    const score = quality === 'high' ? 82 + (idx % 14) : quality === 'medium' ? 62 + (idx % 12) : 38 + (idx % 18)
+    const multiplier = score >= 80 ? 1.2 : score >= 65 ? 1.0 : 0.5
+    const rewardBase = 5000
+    const QUESTIONS = [
+      { q: 'Which mobile banking app do you use most frequently?', type: 'single_choice', answers: ['Khan Bank', 'TDB Digital', 'Golomt Bank', 'XacBank', 'Other'] },
+      { q: 'How often do you make digital payments per week?', type: 'scale', answers: ['1–2 times', '3–5 times', '6–10 times', '10+ times'] },
+      { q: 'What is your primary reason for using digital payments?', type: 'single_choice', answers: ['Convenience', 'Speed', 'Rewards', 'No cash available', 'Safety'] },
+      { q: 'Rate your overall satisfaction with your current banking app.', type: 'scale', answers: ['1', '2', '3', '4', '5'] },
+      { q: 'Which features do you use most? (Select all that apply)', type: 'multiple_choice', answers: ['Transfers', 'Bill payment', 'QR payment', 'Investment', 'Loans'] },
+      { q: 'How likely are you to recommend your bank to a friend?', type: 'scale', answers: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] },
+      { q: 'What improvement would most increase your satisfaction?', type: 'text', answers: ['Better UI', 'Faster transactions', 'Lower fees', 'More features', 'Better support'] },
+    ]
+    const answers = QUESTIONS.map((q, qi) => {
+      const timeSec = quality === 'high' ? 8 + qi * 4 + (idx % 5) : quality === 'medium' ? 4 + qi * 2 : 1 + qi
+      const flagged = quality === 'low' && qi % 3 === 0
+      return {
+        question_number: qi + 1,
+        question_text: q.q,
+        question_type: q.type,
+        answer: q.answers[(idx + qi) % q.answers.length]!,
+        time_seconds: timeSec,
+        flagged,
+        flag_reason: flagged ? (timeSec < 3 ? 'Answered too fast (< 3s)' : 'Pattern matches straight-lining') : undefined,
+      }
+    })
+    const qualityFactors = [
+      { name: 'Response speed', passed: quality !== 'low', penalty: quality === 'low' ? -20 : 0, note: quality === 'low' ? 'Avg 1.8s/question (below 3s threshold)' : `Avg ${quality === 'high' ? '12.4' : '6.1'}s/question — normal` },
+      { name: 'Straight-lining', passed: quality !== 'low', penalty: quality === 'low' ? -35 : 0, note: quality === 'low' ? '5 consecutive identical answers detected' : 'No straight-lining detected' },
+      { name: 'Attention check', passed: quality === 'high', penalty: quality === 'medium' ? -10 : quality === 'low' ? -50 : 0, note: quality === 'high' ? 'Passed all attention checks' : quality === 'medium' ? 'Missed 1 of 2 attention checks' : 'Failed attention check' },
+      { name: 'Position bias', passed: quality !== 'low', penalty: quality === 'low' ? -20 : 0, note: quality === 'low' ? 'First option selected >70% of questions' : 'Answer distribution looks natural' },
+      { name: 'Tab visibility', passed: true, penalty: 0, note: 'Stayed on tab throughout survey' },
+    ]
+    return ok({
+      id: responseId,
+      respondent_name: MN_NAMES[idx % MN_NAMES.length]!,
+      quality,
+      quality_score: score,
+      status: statuses[idx % statuses.length]!,
+      submitted_at: new Date(Date.now() - idx * 3600000 * 2).toISOString(),
+      time_taken_seconds: answers.reduce((s, a) => s + a.time_seconds, 0),
+      reward_base: rewardBase,
+      multiplier,
+      reward_earned: Math.round(rewardBase * multiplier),
+      quality_factors: qualityFactors,
+      answers,
+    })
+  }),
+
   http.get(`${API}/company/surveys/:id`, async ({ params }) => {
     await delay(250)
     const survey = companyDb.surveys.find((s) => s.id === params.id)
@@ -595,6 +720,52 @@ export const handlers = [
     return ok(companyDb.billingTxns)
   }),
 
+  http.get(`${API}/company/billing/transactions/:txId`, async ({ params }) => {
+    await delay(250)
+    const tx = companyDb.billingTxns.find((t) => t.id === params.txId)
+    if (!tx) return new Response(null, { status: 404 })
+
+    const GATEWAYS = ['QPay', 'Social Pay', 'Bank Transfer']
+    const PACKAGES: Record<number, { label: string; bonus: number }> = {
+      100000:  { label: 'Starter',    bonus: 0       },
+      500000:  { label: 'Popular',    bonus: 50000   },
+      1000000: { label: 'Growth',     bonus: 150000  },
+      5000000: { label: 'Enterprise', bonus: 1000000 },
+    }
+    const idx = parseInt((tx.id.split('-').pop() ?? '1'), 10)
+    const gateway = GATEWAYS[idx % GATEWAYS.length]!
+    const balanceBefore = 250000 + idx * 17300
+    const balanceAfter  = tx.type === 'purchase' ? balanceBefore + tx.amount : balanceBefore - tx.amount
+
+    const detail = tx.type === 'purchase'
+      ? {
+          ...tx,
+          package_label:  PACKAGES[tx.amount]?.label ?? 'Custom',
+          base_amount:    PACKAGES[tx.amount] ? tx.amount - (PACKAGES[tx.amount]?.bonus ?? 0) : tx.amount,
+          bonus_amount:   PACKAGES[tx.amount]?.bonus ?? 0,
+          gateway,
+          reference:      `TXN-${tx.id.toUpperCase()}-${idx}`,
+          status:         'completed',
+          balance_before: balanceBefore,
+          balance_after:  balanceAfter,
+        }
+      : {
+          ...tx,
+          survey_name:        tx.note.replace('Survey spend — ', ''),
+          responses_paid:     Math.max(1, Math.round(tx.amount / 1000)),
+          amount_per_response: 1000,
+          platform_fee:       Math.round(tx.amount * 0.1),
+          respondent_payout:  Math.round(tx.amount * 0.9),
+          gateway:            null,
+          reference:          `SPEND-${tx.id.toUpperCase()}`,
+          status:             'completed',
+          balance_before:     balanceBefore,
+          balance_after:      balanceAfter,
+        }
+
+    return ok(detail)
+  }),
+
   http.post(`${API}/company/billing/purchase`, async ({ request }) => {
     await delay(500)
     const body = (await request.json()) as { amount: number; gateway: string }
@@ -614,6 +785,15 @@ export const handlers = [
     const body = (await request.json()) as Record<string, string>
     if (body.company_name) companyDb.user.company_name = body.company_name
     return ok(companyDb.user)
+  }),
+
+  http.put(`${API}/company/settings/password`, async ({ request }) => {
+    await delay(400)
+    const body = (await request.json()) as { current_password: string; new_password: string }
+    if (!body.current_password || !body.new_password) {
+      return err('VALIDATION_ERROR', 'All fields required')
+    }
+    return ok({ message: 'Password updated successfully' })
   }),
 
   // ══════════════════════════════════════════════════
@@ -688,6 +868,27 @@ export const handlers = [
     return ok(companies.slice(0, limit))
   }),
 
+  http.get(`${API}/admin/companies/:id/billing`, async ({ params }) => {
+    await delay(200)
+    const company = adminDb.companies.find((c) => c.id === params.id)
+    if (!company) return err('NOT_FOUND', 'Company not found', 404)
+    const rr = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
+    const types = ['credit_purchase', 'survey_spend', 'credit_purchase', 'survey_spend', 'survey_spend', 'refund'] as const
+    const now = Date.now()
+    const txns = Array.from({ length: 12 }, (_, i) => {
+      const type = types[i % types.length]!
+      const amount = type === 'credit_purchase' ? rr(5, 50) * 10000 : type === 'refund' ? rr(1, 5) * 1000 : rr(1, 20) * 1000
+      return {
+        id: `btx-${params.id}-${i}`,
+        type,
+        amount,
+        description: type === 'credit_purchase' ? 'Credits purchased' : type === 'refund' ? 'Survey refund' : 'Survey reward spend',
+        created_at: new Date(now - i * rr(1, 5) * 86400000).toISOString(),
+      }
+    })
+    return ok({ credits_balance: company.credits_balance, total_spent: company.total_spent, transactions: txns })
+  }),
+
   http.patch(`${API}/admin/companies/:id/status`, async ({ params, request }) => {
     await delay(300)
     const body = (await request.json()) as { action: string }
@@ -710,18 +911,35 @@ export const handlers = [
     await delay(200)
     const respondent = adminDb.respondents.find((r) => r.id === params.id)
     if (!respondent) return err('NOT_FOUND', 'Respondent not found', 404)
-    const SURVEY_TITLES_EN = ['Consumer Preferences Study', 'Brand Awareness Survey', 'Product Feedback', 'User Experience Research', 'Market Analysis']
+    const SURVEY_TITLES_EN = [
+      'Consumer Preferences Study', 'Brand Awareness Survey', 'Product Feedback',
+      'User Experience Research', 'Market Analysis', 'Digital Habits Survey',
+      'Financial Behavior Study', 'Healthcare Opinions Survey', 'Retail Satisfaction',
+      'Social Media Usage Survey',
+    ]
+    const REWARD_AMOUNTS = [0, 1000, 2000, 3000, 5000, 10000, 15000]
     const qualities: Array<'high' | 'medium' | 'low'> = ['high', 'high', 'medium', 'low']
     const statuses: Array<'earned' | 'pending' | 'invalidated'> = ['earned', 'earned', 'earned', 'pending', 'invalidated']
     const now = Date.now()
-    const count = Math.min(respondent.surveys_completed, 8)
-    const history = Array.from({ length: count }, (_, i) => ({
-      id: `hist-${respondent.id}-${i}`,
-      survey_title: SURVEY_TITLES_EN[i % SURVEY_TITLES_EN.length]!,
-      quality: qualities[i % qualities.length]!,
-      reward_status: statuses[i % statuses.length]!,
-      submitted_at: new Date(now - i * 86400000).toISOString(),
-    }))
+    const count = Math.min(respondent.surveys_completed, 10)
+    const history = Array.from({ length: count }, (_, i) => {
+      const quality = qualities[i % qualities.length]!
+      const rewardStatus = statuses[i % statuses.length]!
+      const baseReward = REWARD_AMOUNTS[i % REWARD_AMOUNTS.length]!
+      const rr = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
+      const qualityScore = quality === 'high' ? rr(85, 99) : quality === 'medium' ? rr(65, 84) : rr(30, 64)
+      const surveyRef = adminDb.allSurveys[i % adminDb.allSurveys.length]!
+      return {
+        id: `hist-${respondent.id}-${i}`,
+        survey_id: surveyRef.id,
+        survey_title: SURVEY_TITLES_EN[i % SURVEY_TITLES_EN.length]!,
+        quality,
+        quality_score: qualityScore,
+        reward_amount: rewardStatus === 'earned' ? baseReward : rewardStatus === 'pending' ? baseReward : 0,
+        reward_status: rewardStatus,
+        submitted_at: new Date(now - i * 86400000 * rr(1, 3)).toISOString(),
+      }
+    })
     return ok(history)
   }),
 
@@ -753,7 +971,8 @@ export const handlers = [
     if (resp) {
       if (body.action === 'warn') { resp.status = 'warned'; resp.warning_count += 1 }
       else if (body.action === 'suspend') resp.status = 'suspended'
-      else if (body.action === 'unsuspend') resp.status = 'active'
+      else if (body.action === 'unsuspend' || body.action === 'reinstate') { resp.status = 'active'; resp.warning_count = 0 }
+      else if (body.action === 'clear_warnings') { resp.status = 'active'; resp.warning_count = 0 }
     }
     return ok(resp ?? null)
   }),
@@ -769,12 +988,69 @@ export const handlers = [
     const count = Math.min(survey.current_responses, 8)
     const responses = Array.from({ length: count }, (_, i) => ({
       id: `adminresp-${survey.id}-${i}`,
+      respondent_id: `resp-${(i % adminDb.respondents.length) + 1}`,
       respondent_name: MN_NAMES[i % MN_NAMES.length]!,
       quality: qualities[i % qualities.length]!,
       status: statuses[i % statuses.length]!,
       submitted_at: new Date(now - i * 3600000 * 3).toISOString(),
     }))
     return ok(responses)
+  }),
+
+  http.get(`${API}/admin/surveys/:surveyId/responses/:responseId`, async ({ params }) => {
+    await delay(200)
+    const { responseId } = params as { surveyId: string; responseId: string }
+    const idx = parseInt(responseId.split('-').pop() ?? '0', 10)
+    const MN_NAMES = ['Батаа', 'Мөнхбат', 'Оюунбаяр', 'Дулмаа', 'Энхтүвшин', 'Ганбаатар', 'Номин', 'Нарандэлгэр']
+    const qualities: Array<'high' | 'medium' | 'low'> = ['high', 'high', 'medium', 'low']
+    const statuses: Array<'earned' | 'pending' | 'invalidated'> = ['earned', 'earned', 'pending', 'invalidated']
+    const quality = qualities[idx % qualities.length]!
+    const score = quality === 'high' ? 82 + (idx % 14) : quality === 'medium' ? 62 + (idx % 12) : 38 + (idx % 18)
+    const multiplier = score >= 80 ? 1.2 : score >= 65 ? 1.0 : 0.5
+    const rewardBase = 5000
+    const QUESTIONS = [
+      { q: 'Which mobile banking app do you use most frequently?', type: 'single_choice', answers: ['Khan Bank', 'TDB Digital', 'Golomt Bank', 'XacBank', 'Other'] },
+      { q: 'How often do you make digital payments per week?', type: 'scale', answers: ['1–2 times', '3–5 times', '6–10 times', '10+ times'] },
+      { q: 'What is your primary reason for using digital payments?', type: 'single_choice', answers: ['Convenience', 'Speed', 'Rewards', 'No cash available', 'Safety'] },
+      { q: 'Rate your overall satisfaction with your current banking app.', type: 'scale', answers: ['1', '2', '3', '4', '5'] },
+      { q: 'Which features do you use most? (Select all that apply)', type: 'multiple_choice', answers: ['Transfers', 'Bill payment', 'QR payment', 'Investment', 'Loans'] },
+      { q: 'How likely are you to recommend your bank to a friend?', type: 'scale', answers: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] },
+      { q: 'What improvement would most increase your satisfaction?', type: 'text', answers: ['Better UI', 'Faster transactions', 'Lower fees', 'More features', 'Better support'] },
+    ]
+    const answers = QUESTIONS.map((q, qi) => {
+      const timeSec = quality === 'high' ? 8 + qi * 4 + (idx % 5) : quality === 'medium' ? 4 + qi * 2 : 1 + qi
+      const flagged = quality === 'low' && qi % 3 === 0
+      return {
+        question_number: qi + 1,
+        question_text: q.q,
+        question_type: q.type,
+        answer: q.answers[(idx + qi) % q.answers.length]!,
+        time_seconds: timeSec,
+        flagged,
+        flag_reason: flagged ? (timeSec < 3 ? 'Answered too fast (< 3s)' : 'Pattern matches straight-lining') : undefined,
+      }
+    })
+    const qualityFactors = [
+      { name: 'Response speed', passed: quality !== 'low', penalty: quality === 'low' ? -20 : 0, note: quality === 'low' ? 'Avg 1.8s/question (below 3s threshold)' : `Avg ${quality === 'high' ? '12.4' : '6.1'}s/question — normal` },
+      { name: 'Straight-lining', passed: quality !== 'low', penalty: quality === 'low' ? -35 : 0, note: quality === 'low' ? '5 consecutive identical answers detected' : 'No straight-lining detected' },
+      { name: 'Attention check', passed: quality === 'high', penalty: quality === 'medium' ? -10 : quality === 'low' ? -50 : 0, note: quality === 'high' ? 'Passed all attention checks' : quality === 'medium' ? 'Missed 1 of 2 attention checks' : 'Failed attention check' },
+      { name: 'Position bias', passed: quality !== 'low', penalty: quality === 'low' ? -20 : 0, note: quality === 'low' ? 'First option selected >70% of questions' : 'Answer distribution looks natural' },
+      { name: 'Tab visibility', passed: true, penalty: 0, note: 'Stayed on tab throughout survey' },
+    ]
+    return ok({
+      id: responseId,
+      respondent_name: MN_NAMES[idx % MN_NAMES.length]!,
+      quality,
+      quality_score: score,
+      status: statuses[idx % statuses.length]!,
+      submitted_at: new Date(Date.now() - idx * 3600000 * 3).toISOString(),
+      time_taken_seconds: answers.reduce((s, a) => s + a.time_seconds, 0),
+      reward_base: rewardBase,
+      multiplier,
+      reward_earned: Math.round(rewardBase * multiplier),
+      quality_factors: qualityFactors,
+      answers,
+    })
   }),
 
   http.get(`${API}/admin/surveys/:id`, async ({ params }) => {
@@ -897,5 +1173,100 @@ export const handlers = [
       else if (body.action === 'ban') alert.status = 'banned'
     }
     return ok(alert ?? null)
+  }),
+
+  // ══════════════════════════════════════════════════
+  // COMPANY NOTIFICATIONS
+  // ══════════════════════════════════════════════════
+
+  http.get(`${API}/company/notifications/unread-count`, async () => {
+    await delay(100)
+    const unread = companyDb.notifications.filter((n: Record<string, unknown>) => !n.read).length
+    return ok({ unread })
+  }),
+
+  http.get(`${API}/company/notifications`, async () => {
+    await delay(250)
+    return ok(companyDb.notifications)
+  }),
+
+  http.patch(`${API}/company/notifications/:id/read`, async ({ params }) => {
+    await delay(100)
+    const n = companyDb.notifications.find((n: Record<string, unknown>) => n.id === params.id)
+    if (n) n.read = true
+    return ok(n ?? null)
+  }),
+
+  http.patch(`${API}/company/notifications/read-all`, async () => {
+    await delay(150)
+    companyDb.notifications.forEach((n: Record<string, unknown>) => { n.read = true })
+    return ok(null)
+  }),
+
+  http.delete(`${API}/company/notifications/:id`, async ({ params }) => {
+    await delay(100)
+    const idx = companyDb.notifications.findIndex((n: Record<string, unknown>) => n.id === params.id)
+    if (idx !== -1) companyDb.notifications.splice(idx, 1)
+    return ok(null)
+  }),
+
+  // ══════════════════════════════════════════════════
+  // ADMIN NOTIFICATIONS
+  // ══════════════════════════════════════════════════
+
+  http.get(`${API}/admin/notifications/unread-count`, async () => {
+    await delay(100)
+    const unread = adminDb.notifications.filter((n: Record<string, unknown>) => !n.read).length
+    return ok({ unread })
+  }),
+
+  http.get(`${API}/admin/notifications`, async () => {
+    await delay(250)
+    return ok(adminDb.notifications)
+  }),
+
+  http.patch(`${API}/admin/notifications/:id/read`, async ({ params }) => {
+    await delay(100)
+    const n = adminDb.notifications.find((n: Record<string, unknown>) => n.id === params.id)
+    if (n) n.read = true
+    return ok(n ?? null)
+  }),
+
+  http.patch(`${API}/admin/notifications/read-all`, async () => {
+    await delay(150)
+    adminDb.notifications.forEach((n: Record<string, unknown>) => { n.read = true })
+    return ok(null)
+  }),
+
+  http.delete(`${API}/admin/notifications/:id`, async ({ params }) => {
+    await delay(100)
+    const idx = adminDb.notifications.findIndex((n: Record<string, unknown>) => n.id === params.id)
+    if (idx !== -1) adminDb.notifications.splice(idx, 1)
+    return ok(null)
+  }),
+
+  // ══════════════════════════════════════════════════
+  // ADMIN SETTINGS
+  // ══════════════════════════════════════════════════
+
+  http.get(`${API}/admin/settings`, async () => {
+    await delay(200)
+    return ok({
+      full_name: adminDb.user.full_name,
+      email: adminDb.user.email,
+      admin_role: adminDb.user.admin_role,
+      notifications: adminDb.settings.notifications,
+      security: adminDb.settings.security,
+    })
+  }),
+
+  http.put(`${API}/admin/settings`, async ({ request }) => {
+    await delay(300)
+    const body = (await request.json()) as Record<string, unknown>
+    if (body.full_name) adminDb.user.full_name = body.full_name as string
+    if (body.email) adminDb.user.email = body.email as string
+    if (body.notifications) adminDb.settings.notifications = body.notifications as typeof adminDb.settings.notifications
+    if (body.security) adminDb.settings.security = { ...adminDb.settings.security, ...(body.security as object) }
+    return ok(null)
   }),
 ]

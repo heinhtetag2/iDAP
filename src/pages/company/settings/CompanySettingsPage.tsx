@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Building2, Bell, Users, Save, CheckCircle2, Mail, Globe } from 'lucide-react'
+import { Building2, Bell, Users, Save, CheckCircle2, Mail, Globe, Lock, Eye, EyeOff } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
 import { useCompanyAuthStore } from '@/shared/model/companyAuthStore'
 import { cn } from '@/shared/lib'
@@ -26,6 +26,40 @@ export default function CompanySettingsPage() {
   })
 
   const [teamInvite, setTeamInvite] = useState('')
+
+  const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' })
+  const [showPw, setShowPw] = useState({ current: false, next: false, confirm: false })
+  const [pwSaved, setPwSaved] = useState(false)
+  const [pwError, setPwError] = useState('')
+
+  const passwordMutation = useMutation({
+    mutationFn: async () => {
+      await apiClient.put('/company/settings/password', { current_password: passwords.current, new_password: passwords.next })
+    },
+    onSuccess: () => {
+      setPasswords({ current: '', next: '', confirm: '' })
+      setPwError('')
+      setPwSaved(true)
+      setTimeout(() => setPwSaved(false), 2500)
+    },
+  })
+
+  const handlePasswordSave = () => {
+    setPwError('')
+    if (!passwords.current || !passwords.next || !passwords.confirm) {
+      setPwError('All fields are required.')
+      return
+    }
+    if (passwords.next.length < 8) {
+      setPwError('New password must be at least 8 characters.')
+      return
+    }
+    if (passwords.next !== passwords.confirm) {
+      setPwError('New passwords do not match.')
+      return
+    }
+    passwordMutation.mutate()
+  }
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -216,6 +250,58 @@ export default function CompanySettingsPage() {
             Invite
           </button>
         </div>
+      </div>
+      {/* Change password */}
+      <div className="rounded-xl border border-border bg-white p-5 space-y-4">
+        <h2 className="font-semibold text-text-primary flex items-center gap-2">
+          <Lock className="h-4 w-4 text-indigo-600" />
+          Change Password
+        </h2>
+
+        {pwSaved && (
+          <div className="flex items-center gap-2 rounded-lg bg-success-50 border border-success-200 px-3 py-2 text-success-600 text-sm">
+            <CheckCircle2 className="h-4 w-4" /> Password updated successfully
+          </div>
+        )}
+        {pwError && (
+          <p className="text-sm text-danger-600 bg-danger-50 border border-danger-200 rounded-lg px-3 py-2">{pwError}</p>
+        )}
+
+        <div className="space-y-3">
+          {([
+            { key: 'current' as const, label: 'Current Password' },
+            { key: 'next' as const, label: 'New Password' },
+            { key: 'confirm' as const, label: 'Confirm New Password' },
+          ]).map(({ key, label }) => (
+            <div key={key}>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">{label}</label>
+              <div className="relative">
+                <input
+                  type={showPw[key] ? 'text' : 'password'}
+                  value={passwords[key]}
+                  onChange={(e) => setPasswords((p) => ({ ...p, [key]: e.target.value }))}
+                  className="h-10 w-full rounded-lg border border-border px-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw((s) => ({ ...s, [key]: !s[key] }))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                >
+                  {showPw[key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={handlePasswordSave}
+          disabled={passwordMutation.isPending}
+          className="flex items-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 px-4 py-2 text-sm font-semibold text-white transition-colors"
+        >
+          <Lock className="h-4 w-4" />
+          {passwordMutation.isPending ? 'Updating…' : 'Update Password'}
+        </button>
       </div>
     </div>
   )

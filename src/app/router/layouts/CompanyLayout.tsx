@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Outlet, useNavigate, Link } from 'react-router-dom'
 import { Menu, Bell, LogOut, ChevronDown, LayoutGrid } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { apiClient } from '@/shared/api/client'
 import { cn } from '@/shared/lib/cn'
 import { SidebarCompany } from '@/widgets/sidebar-company/SidebarCompany'
 import { useCompanyAuthStore } from '@/shared/model/companyAuthStore'
@@ -10,6 +12,16 @@ export function CompanyLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const { user, logout } = useCompanyAuthStore()
+
+  const { data: notifData } = useQuery<{ unread: number }>({
+    queryKey: ['company', 'notifications', 'unread'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/company/notifications/unread-count')
+      return data as { unread: number }
+    },
+    refetchInterval: 30000,
+  })
+  const unreadCount = notifData?.unread ?? 0
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -40,9 +52,14 @@ export function CompanyLayout() {
 
           <div className="flex items-center gap-3">
             {/* Notifications */}
-            <button className="relative p-2 rounded-lg hover:bg-gray-100">
+            <Link to={ROUTES.COMPANY_NOTIFICATIONS} className="relative p-2 rounded-lg hover:bg-gray-100">
               <Bell className="h-5 w-5 text-text-secondary" />
-            </button>
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Link>
 
             {/* Profile dropdown */}
             <div className="relative">
@@ -80,8 +97,10 @@ export function CompanyLayout() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <Outlet />
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-screen-2xl p-4 sm:p-6 xl:p-8 2xl:px-12">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

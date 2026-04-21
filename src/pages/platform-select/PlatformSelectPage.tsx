@@ -115,7 +115,7 @@ export default function PlatformSelectPage() {
 
       {/* Portal cards */}
       <div className="relative flex-1 px-4 pb-12">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="mx-auto grid w-full max-w-screen-xl grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-6">
           {PORTALS.map((p) => {
             const Icon = p.icon
             const isHovered = hovered === p.id

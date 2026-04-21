@@ -1,10 +1,23 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { PlusCircle, Trash2, GripVertical, ChevronDown, ChevronUp, ArrowLeft, Save, Send } from 'lucide-react'
+import { PlusCircle, Trash2, GripVertical, ChevronDown, ChevronUp, Save, Send, Zap, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/shared/lib'
+import { Breadcrumb } from '@/shared/ui'
 import { apiClient } from '@/shared/api/client'
 import { ROUTES } from '@/shared/config/routes'
+
+// Estimated eligible respondent pool per trust level (platform-wide)
+const TRUST_LEVEL_POOL: Record<number, number> = { 1: 8500, 2: 4200, 3: 1800, 4: 650, 5: 120 }
+
+// Platform takes 10% on top of respondent payouts
+const PLATFORM_FEE_RATE = 0.10
+
+// Average minutes per question type
+const MINS_PER_QUESTION: Record<string, number> = {
+  single_choice: 0.5, multi_choice: 0.7, text: 1.5,
+  rating: 0.3, scale: 0.3, ranking: 1.0, matrix: 1.5, date: 0.3,
+}
 
 const QUESTION_TYPES = [
   { value: 'single_choice', label: 'Single Choice' },
@@ -221,18 +234,37 @@ export default function CompanySurveyBuilderPage() {
       return { ...prev, questions: qs }
     })
 
+  // ── Derived campaign metrics ──────────────────────────────────────────────
+  const pool = TRUST_LEVEL_POOL[form.trust_level_required] ?? 8500
+  const rewardPerMin = form.estimated_minutes > 0 ? form.reward_amount / form.estimated_minutes : 0
+  const rewardTier = rewardPerMin < 80 ? 'low' : rewardPerMin < 150 ? 'fair' : 'competitive'
+  const dailyVelocity = Math.max(1, Math.round(pool * 0.012))
+  const daysToFill = Math.ceil(form.max_responses / dailyVelocity)
+  const daysUntilEnd = form.ends_at
+    ? Math.ceil((new Date(form.ends_at).getTime() - Date.now()) / 86_400_000)
+    : 30
+  const campaignHealthy = daysUntilEnd >= daysToFill
+  const baseCost = form.reward_amount * form.max_responses
+  const platformFee = Math.round(baseCost * PLATFORM_FEE_RATE)
+  const totalCost = baseCost + platformFee
+
+  const calcAutoMinutes = () =>
+    Math.max(1, Math.round(form.questions.reduce((s, q) => s + (MINS_PER_QUESTION[q.type] ?? 0.5), 0)))
+
   const labelClass = 'block text-sm font-medium text-text-secondary mb-1.5'
   const inputClass = 'h-10 w-full rounded-lg border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
 
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => navigate(ROUTES.COMPANY_SURVEYS)}
-          className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary">
-          <ArrowLeft className="h-4 w-4" /> Back
-        </button>
-        <h1 className="text-2xl font-bold text-text-primary">Survey Builder</h1>
+        <div className="flex-1">
+          <Breadcrumb items={[
+            { label: 'Surveys', href: ROUTES.COMPANY_SURVEYS },
+            { label: 'New Survey' },
+          ]} />
+          <h1 className="text-2xl font-bold text-text-primary">Survey Builder</h1>
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => saveMutation.mutate(true)}
@@ -285,62 +317,144 @@ export default function CompanySurveyBuilderPage() {
           <div className="rounded-xl border border-border bg-white p-5 space-y-4">
             <h2 className="font-semibold text-text-primary">Reward & Limits</h2>
 
+            {/* Reward + Max Responses */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelClass}>Reward (₮)</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-medium text-text-secondary">Reward (₮)</label>
+                  <span className={cn('text-[11px] font-semibold px-1.5 py-0.5 rounded-full',
+                    rewardTier === 'competitive' ? 'bg-success-50 text-success-700' :
+                    rewardTier === 'fair'        ? 'bg-yellow-50 text-yellow-700' :
+                                                   'bg-red-50 text-red-500')}>
+                    {rewardTier === 'competitive' && <span>✓ Competitive</span>}
+                    {rewardTier === 'fair'        && <span>~ Fair</span>}
+                    {rewardTier === 'low'         && <span>↓ Low</span>}
+                  </span>
+                </div>
                 <input type="number" value={form.reward_amount} min={100}
                   onChange={(e) => set('reward_amount', parseInt(e.target.value))}
                   className={inputClass} />
+                <p className="text-[11px] text-text-muted mt-1">
+                  ₮{rewardPerMin.toFixed(0)}/min · min ₮100
+                </p>
               </div>
               <div>
                 <label className={labelClass}>Max Responses</label>
                 <input type="number" value={form.max_responses} min={10}
                   onChange={(e) => set('max_responses', parseInt(e.target.value))}
                   className={inputClass} />
+                <p className="text-[11px] text-text-muted mt-1">min 10 responses</p>
               </div>
             </div>
 
+            {/* Est. Minutes + Trust Level */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelClass}>Est. Minutes</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-medium text-text-secondary">Est. Minutes</label>
+                  <button
+                    type="button"
+                    onClick={() => set('estimated_minutes', calcAutoMinutes())}
+                    className="flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-700"
+                  >
+                    <Zap className="h-3 w-3" /> Auto ({calcAutoMinutes()}m)
+                  </button>
+                </div>
                 <input type="number" value={form.estimated_minutes} min={1}
                   onChange={(e) => set('estimated_minutes', parseInt(e.target.value))}
                   className={inputClass} />
+                <p className="text-[11px] text-text-muted mt-1">shown to respondents</p>
               </div>
               <div>
                 <label className={labelClass}>Min Trust Level</label>
                 <select value={form.trust_level_required}
                   onChange={(e) => set('trust_level_required', parseInt(e.target.value))}
                   className={inputClass}>
-                  {TRUST_LEVELS.map((l) => <option key={l} value={l}>Level {l}</option>)}
+                  {TRUST_LEVELS.map((l) => (
+                    <option key={l} value={l}>
+                      Level {l} — ~{(TRUST_LEVEL_POOL[l] ?? 0).toLocaleString()} people
+                    </option>
+                  ))}
                 </select>
+                <p className="text-[11px] text-text-muted mt-1">
+                  ~{pool.toLocaleString()} eligible respondents
+                </p>
               </div>
             </div>
 
+            {/* End Date */}
             <div>
               <label className={labelClass}>End Date</label>
               <input type="date" value={form.ends_at}
+                min={new Date().toISOString().split('T')[0]}
                 onChange={(e) => set('ends_at', e.target.value)}
                 className={inputClass} />
+              <p className={cn('text-[11px] mt-1 flex items-center gap-1',
+                campaignHealthy ? 'text-success-600' : 'text-red-500')}>
+                {campaignHealthy
+                  ? <><CheckCircle2 className="h-3 w-3" /> Fills in ~{daysToFill}d · {daysUntilEnd - daysToFill}d buffer</>
+                  : <><AlertTriangle className="h-3 w-3" /> Needs ~{daysToFill}d but only {Math.max(0, daysUntilEnd)}d left</>}
+              </p>
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer">
+            {/* Anonymous */}
+            <label className="flex items-start gap-2.5 cursor-pointer group">
               <input type="checkbox" checked={form.is_anonymous}
                 onChange={(e) => set('is_anonymous', e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-              <span className="text-sm text-text-secondary">Anonymous responses</span>
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+              <div>
+                <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">
+                  Anonymous responses
+                </span>
+                <p className="text-[11px] text-text-muted mt-0.5 leading-relaxed">
+                  Respondent names are hidden. Age, gender &amp; region are still included in your reports.
+                </p>
+              </div>
             </label>
           </div>
 
-          {/* Summary */}
-          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm">
-            <p className="font-medium text-indigo-700 mb-1">Estimated Cost</p>
-            <p className="text-indigo-600 text-xl font-bold">
-              ₮{(form.reward_amount * form.max_responses).toLocaleString()}
+          {/* Cost summary */}
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+            <p className="font-semibold text-indigo-700 text-sm">Estimated Cost</p>
+
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-indigo-400">Respondent payouts</span>
+                <span className="font-medium text-indigo-700">₮{baseCost.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-indigo-400">Platform fee (10%)</span>
+                <span className="font-medium text-indigo-700">₮{platformFee.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between border-t border-indigo-200 pt-2">
+                <span className="font-semibold text-indigo-700">Total</span>
+                <span className="text-xl font-bold text-indigo-700">₮{totalCost.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-indigo-400">
+              {form.max_responses} responses × ₮{form.reward_amount.toLocaleString()} + fees
             </p>
-            <p className="text-xs text-indigo-400 mt-1">
-              {form.max_responses} responses × ₮{form.reward_amount.toLocaleString()} each
-            </p>
+
+            {/* Campaign health */}
+            <div className={cn('rounded-lg p-3',
+              campaignHealthy ? 'bg-success-50 border border-success-200' : 'bg-red-50 border border-red-200')}>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                {campaignHealthy
+                  ? <CheckCircle2 className="h-3.5 w-3.5 text-success-600" />
+                  : <AlertTriangle className="h-3.5 w-3.5 text-red-500" />}
+                <p className={cn('text-xs font-semibold',
+                  campaignHealthy ? 'text-success-700' : 'text-red-600')}>
+                  {campaignHealthy ? 'Campaign looks healthy' : 'Timeline at risk'}
+                </p>
+              </div>
+              <div className={cn('text-[11px] space-y-0.5',
+                campaignHealthy ? 'text-success-600' : 'text-red-500')}>
+                <p>Pool: ~{pool.toLocaleString()} respondents at Level {form.trust_level_required}+</p>
+                <p>Velocity: ~{dailyVelocity} responses / day</p>
+                <p>Fill time: ~{daysToFill} day{daysToFill !== 1 ? 's' : ''} to collect {form.max_responses} responses</p>
+              </div>
+            </div>
           </div>
         </div>
 

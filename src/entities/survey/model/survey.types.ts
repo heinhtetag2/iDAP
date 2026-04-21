@@ -77,8 +77,12 @@ export interface SubmitResult {
   response_id: string
   status: 'completed' | 'pending_review' | 'invalidated'
   quality_score: number
+  quality_multiplier: number
+  level_upgraded: boolean
+  new_trust_level: number
   reward: {
     amount: number
+    base_amount: number
     status: 'granted' | 'pending' | 'invalidated'
     wallet_balance_after: number
   }

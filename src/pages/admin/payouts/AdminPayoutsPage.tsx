@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Banknote, CheckCircle2, XCircle, Clock, TrendingUp } from 'lucide-react'
 import { cn } from '@/shared/lib'
+import { Tooltip } from '@/shared/ui'
 import { apiClient } from '@/shared/api/client'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -84,7 +85,7 @@ export default function AdminPayoutsPage() {
   const filtered = payouts
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 w-full">
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Payout Management</h1>
         <p className="text-sm text-text-secondary mt-0.5">Review and release respondent withdrawal requests</p>
@@ -178,9 +179,11 @@ export default function AdminPayoutsPage() {
                   </td>
                   <td className="px-4 py-4 text-sm font-bold text-text-primary">₮{p.amount.toLocaleString()}</td>
                   <td className="px-4 py-4">
-                    <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full font-medium text-text-secondary uppercase">
-                      {p.gateway}
-                    </span>
+                    <Tooltip content={p.gateway === 'qpay' ? 'QPay — Mongolia\'s most widely used mobile payment gateway.' : 'Bonum — bank transfer via Bonum payment network.'} position="bottom">
+                      <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full font-medium text-text-secondary uppercase cursor-default">
+                        {p.gateway}
+                      </span>
+                    </Tooltip>
                   </td>
                   <td className="px-4 py-4 text-xs text-text-muted font-mono">{p.account}</td>
                   <td className="px-4 py-4 text-xs text-text-muted">
@@ -190,14 +193,18 @@ export default function AdminPayoutsPage() {
                   <td className="px-4 py-4">
                     {p.status === 'pending' && (
                       <div className="flex items-center gap-1">
-                        <button onClick={() => actionMutation.mutate({ ids: [p.id], action: 'approve' })}
-                          className="rounded bg-success-600 hover:bg-success-700 px-2.5 py-1 text-xs font-medium text-white transition-colors">
-                          Approve
-                        </button>
-                        <button onClick={() => actionMutation.mutate({ ids: [p.id], action: 'reject' })}
-                          className="rounded border border-border hover:bg-gray-50 px-2.5 py-1 text-xs font-medium text-text-secondary transition-colors">
-                          Reject
-                        </button>
+                        <Tooltip content="Approve and release this payout to the respondent's account." position="bottom">
+                          <button onClick={() => actionMutation.mutate({ ids: [p.id], action: 'approve' })}
+                            className="rounded bg-success-600 hover:bg-success-700 px-2.5 py-1 text-xs font-medium text-white transition-colors">
+                            Approve
+                          </button>
+                        </Tooltip>
+                        <Tooltip content="Reject this request — funds stay in the respondent's wallet balance." position="bottom">
+                          <button onClick={() => actionMutation.mutate({ ids: [p.id], action: 'reject' })}
+                            className="rounded border border-border hover:bg-gray-50 px-2.5 py-1 text-xs font-medium text-text-secondary transition-colors">
+                            Reject
+                          </button>
+                        </Tooltip>
                       </div>
                     )}
                   </td>

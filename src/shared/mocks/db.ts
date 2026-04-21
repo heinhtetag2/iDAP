@@ -317,6 +317,8 @@ function createSurveyHistory(): MockSurveyHistoryItem[] {
 export const mockUser: AuthUser = {
   id: 'user-001',
   email: 'batbold@gmail.com',
+  responses_count: 18,
+  avg_quality_score: 82,
   full_name: `${pick(MN_LAST)} ${pick(MN_FIRST)}`,
   phone: '+97699112233',
   avatar_url: 'https://ui-avatars.com/api/?name=BB&background=3b82f6&color=fff',
@@ -434,6 +436,8 @@ function createRespondentsAdmin() {
     warning_count: rand(0, 4),
     status: pick(statuses),
     joined_at: new Date(now - rand(1, 365) * 86400000).toISOString(),
+    avg_quality_score: rand(45, 98),
+    last_active_at: new Date(now - rand(0, 30) * 86400000).toISOString(),
   }))
 }
 
@@ -565,12 +569,34 @@ function createActivityFeed() {
   })
 }
 
+const now = Date.now()
+const companyNotifications = [
+  { id: 'cn-1', type: 'survey_response', title: 'New responses received', message: 'Your "Customer Satisfaction Survey" received 12 new responses today.', read: false, created_at: new Date(now - 1 * 3600000).toISOString() },
+  { id: 'cn-2', type: 'low_credits', title: 'Low credits warning', message: 'Your account balance is below ₮50,000. Top up to keep surveys running.', read: false, created_at: new Date(now - 3 * 3600000).toISOString() },
+  { id: 'cn-3', type: 'survey_completed', title: 'Survey completed', message: '"Brand Awareness Survey" has reached its maximum response quota of 500.', read: false, created_at: new Date(now - 6 * 3600000).toISOString() },
+  { id: 'cn-4', type: 'survey_approved', title: 'Survey approved', message: 'Your survey "Product Feedback Q2" has been approved and is now live.', read: true, created_at: new Date(now - 24 * 3600000).toISOString() },
+  { id: 'cn-5', type: 'weekly_report', title: 'Weekly report ready', message: 'Your weekly analytics report is ready. View response trends and quality scores.', read: true, created_at: new Date(now - 48 * 3600000).toISOString() },
+  { id: 'cn-6', type: 'survey_response', title: 'Response milestone', message: '"Employee Survey 2026" reached 100 responses — 33% of your target.', read: true, created_at: new Date(now - 72 * 3600000).toISOString() },
+]
+
 export const companyDb = {
   user: { ...mockCompanyUser },
   surveys: createCompanySurveys(),
   billingTxns: createCompanyBillingTxns(),
   analyticsCache: new Map<string, ReturnType<typeof createAnalyticsData>>(),
+  notifications: companyNotifications as Array<Record<string, unknown>>,
 }
+
+const adminNotifications = [
+  { id: 'an-1', type: 'fraud_alert', title: 'High severity fraud detected', message: 'User mock-45 flagged for duplicate_ip activity across 8 survey submissions.', read: false, severity: 'high', created_at: new Date(now - 0.5 * 3600000).toISOString() },
+  { id: 'an-2', type: 'company_registered', title: 'New company awaiting approval', message: 'Монголын Телеком has registered and submitted their company profile for review.', read: false, created_at: new Date(now - 2 * 3600000).toISOString() },
+  { id: 'an-3', type: 'payout_requested', title: 'Payout request submitted', message: 'Respondent Батаа requested withdrawal of ₮45,000 via QPay.', read: false, created_at: new Date(now - 4 * 3600000).toISOString() },
+  { id: 'an-4', type: 'fraud_alert', title: 'Fraud alert: VPN detected', message: 'Multiple accounts sharing the same VPN IP completing surveys in quick succession.', read: false, severity: 'medium', created_at: new Date(now - 5 * 3600000).toISOString() },
+  { id: 'an-5', type: 'survey_published', title: 'Survey published by MCS Group', message: 'New survey "Product Market Fit 2026" is now live with 500 response target.', read: true, created_at: new Date(now - 12 * 3600000).toISOString() },
+  { id: 'an-6', type: 'company_registered', title: 'APU Company approved', message: 'APU Company registration was approved. Their first survey is now under review.', read: true, created_at: new Date(now - 24 * 3600000).toISOString() },
+  { id: 'an-7', type: 'user_registered', title: 'User growth spike', message: '47 new respondents registered in the last 24 hours — 3x the daily average.', read: true, created_at: new Date(now - 36 * 3600000).toISOString() },
+  { id: 'an-8', type: 'payout_requested', title: 'Large payout request', message: 'Respondent Нарандэлгэр requested withdrawal of ₮120,000 — manual review required.', read: true, created_at: new Date(now - 48 * 3600000).toISOString() },
+]
 
 export const adminDb = {
   user: { ...mockAdminUser },
@@ -579,6 +605,11 @@ export const adminDb = {
   fraudAlerts: createFraudAlerts(),
   payouts: createPayouts(),
   activityFeed: createActivityFeed(),
+  notifications: adminNotifications as Array<Record<string, unknown>>,
+  settings: {
+    notifications: { fraud_alerts: true, company_approvals: true, payout_requests: true, system_alerts: true, weekly_summary: false },
+    security: { two_factor_enabled: false, session_timeout_minutes: 60 },
+  },
   allSurveys: db.surveys.map((s) => ({
     id: s.id,
     title: s.title_en,

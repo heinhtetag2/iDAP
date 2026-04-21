@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { FileText, Users, CreditCard, TrendingUp, PlusCircle, BarChart2, ArrowUpRight, Clock, CheckCircle2, PauseCircle, Circle } from 'lucide-react'
 import { cn } from '@/shared/lib'
+import { Tooltip } from '@/shared/ui'
 import { apiClient } from '@/shared/api/client'
 import { useCompanyAuthStore } from '@/shared/model/companyAuthStore'
 import { ROUTES } from '@/shared/config/routes'
@@ -55,16 +56,22 @@ function StatCard({
 
 function MiniBarChart({ data }: { data: { day: string; count: number }[] }) {
   const max = Math.max(...data.map((d) => d.count), 1)
+  const CHART_H = 120
   return (
-    <div className="flex items-end gap-1.5 h-16">
-      {data.map((d) => (
-        <div key={d.day} className="flex flex-col items-center gap-1 flex-1">
-          <div
-            className="w-full rounded-t bg-indigo-500 transition-all"
-            style={{ height: `${Math.max((d.count / max) * 100, 6)}%` }}
-          />
-        </div>
-      ))}
+    <div>
+      <div className="flex items-end gap-1.5" style={{ height: `${CHART_H}px` }}>
+        {data.map((d) => {
+          const barH = Math.max((d.count / max) * CHART_H, 4)
+          return (
+            <div key={d.day} className="flex-1 rounded-t bg-indigo-500" style={{ height: `${barH}px` }} />
+          )
+        })}
+      </div>
+      <div className="flex gap-1.5 mt-2">
+        {data.map((d) => (
+          <span key={d.day} className="flex-1 text-center text-[10px] text-text-muted">{d.day}</span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -109,7 +116,7 @@ export default function CompanyDashboardPage() {
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 w-full">
       {/* Welcome */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -128,7 +135,7 @@ export default function CompanyDashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-6">
         <StatCard
           icon={FileText}
           label="Active Surveys"
@@ -159,7 +166,7 @@ export default function CompanyDashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 xl:gap-8">
         {/* Response trend chart */}
         <div className="lg:col-span-2 rounded-xl border border-border bg-white p-5">
           <div className="flex items-center justify-between mb-4">
@@ -221,7 +228,14 @@ export default function CompanyDashboardPage() {
         <div className="divide-y divide-border">
           {recentSurveys?.map((s) => (
             <div key={s.id} className="flex items-center gap-4 px-5 py-3.5">
-              <div className="shrink-0">{statusIcon(s.status)}</div>
+              <Tooltip content={
+                s.status === 'active' ? 'Active — currently collecting responses.' :
+                s.status === 'paused' ? 'Paused — temporarily not accepting responses.' :
+                s.status === 'completed' ? 'Completed — reached maximum responses.' :
+                'Draft — not yet published.'
+              } position="bottom">
+                <div className="shrink-0 cursor-default">{statusIcon(s.status)}</div>
+              </Tooltip>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text-primary truncate">{s.title}</p>
                 <div className="flex items-center gap-2 mt-0.5">
@@ -232,16 +246,20 @@ export default function CompanyDashboardPage() {
                   </span>
                 </div>
               </div>
-              <div className="text-right shrink-0">
-                <p className="text-sm font-semibold text-text-primary">
-                  {s.current_responses}/{s.max_responses}
-                </p>
-                <p className="text-xs text-text-muted">responses</p>
-              </div>
-              <div className="text-right shrink-0 hidden sm:block">
-                <p className="text-sm font-medium text-text-primary">₮{s.reward_amount.toLocaleString()}</p>
-                <p className="text-xs text-text-muted">reward</p>
-              </div>
+              <Tooltip content={`${s.current_responses} of ${s.max_responses} responses collected (${Math.round((s.current_responses / s.max_responses) * 100)}% full).`} position="bottom">
+                <div className="text-right shrink-0 cursor-default">
+                  <p className="text-sm font-semibold text-text-primary">
+                    {s.current_responses}/{s.max_responses}
+                  </p>
+                  <p className="text-xs text-text-muted">responses</p>
+                </div>
+              </Tooltip>
+              <Tooltip content="Per-response reward paid to each respondent who completes this survey." position="bottom">
+                <div className="text-right shrink-0 hidden sm:block cursor-default">
+                  <p className="text-sm font-medium text-text-primary">₮{s.reward_amount.toLocaleString()}</p>
+                  <p className="text-xs text-text-muted">reward</p>
+                </div>
+              </Tooltip>
             </div>
           ))}
           {!recentSurveys && (

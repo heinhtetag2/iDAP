@@ -13,6 +13,8 @@ export interface AuthUser {
   preferred_lang: string
   is_verified: boolean
   warning_count: number
+  responses_count: number
+  avg_quality_score: number
 }
 
 interface AuthState {

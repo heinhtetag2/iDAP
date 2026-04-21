@@ -1,7 +1,8 @@
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, AlertTriangle, Ban, CheckCircle2, Eye, ShieldAlert, User, FileText } from 'lucide-react'
+import { AlertTriangle, Ban, CheckCircle2, Eye, ShieldAlert, User, FileText } from 'lucide-react'
 import { cn } from '@/shared/lib'
+import { Breadcrumb } from '@/shared/ui'
 import { apiClient } from '@/shared/api/client'
 import { ROUTES } from '@/shared/config/routes'
 import { formatDistanceToNow, format } from 'date-fns'
@@ -70,12 +71,13 @@ export default function AdminFraudDetailPage() {
   if (!alert) return null
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 w-full">
       {/* Back + header */}
       <div>
-        <Link to={ROUTES.ADMIN_FRAUD} className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary mb-3 transition-colors">
-          <ArrowLeft className="h-4 w-4" /> Back to fraud queue
-        </Link>
+        <Breadcrumb items={[
+          { label: 'Fraud Queue', href: ROUTES.ADMIN_FRAUD },
+          { label: `Alert — ${alert.trigger}` },
+        ]} />
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">

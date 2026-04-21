@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { TrendingUp, Users, Clock, CheckCircle2, ChevronDown } from 'lucide-react'
 import { cn } from '@/shared/lib'
+import { Tooltip } from '@/shared/ui'
 import { apiClient } from '@/shared/api/client'
 
 interface SurveyOption { id: string; title: string }
@@ -47,11 +48,12 @@ function DailyChart({ data }: { data: { date: string; count: number }[] }) {
         {data.map((d) => (
           <div key={d.date} className="flex flex-col items-center flex-1 group">
             <div className="relative flex-1 w-full flex items-end">
-              <div
-                className="w-full rounded-t bg-indigo-400 group-hover:bg-indigo-600 transition-colors cursor-default"
-                style={{ height: `${Math.max((d.count / max) * 100, 4)}%` }}
-                title={`${d.count} responses`}
-              />
+              <Tooltip content={`${d.date}: ${d.count} response${d.count !== 1 ? 's' : ''}`} position="top">
+                <div
+                  className="w-full rounded-t bg-indigo-400 group-hover:bg-indigo-600 transition-colors cursor-default"
+                  style={{ height: `${Math.max((d.count / max) * 100, 4)}%` }}
+                />
+              </Tooltip>
             </div>
           </div>
         ))}
@@ -133,7 +135,7 @@ export default function CompanyAnalyticsPage() {
   const maxProvince = analytics ? Math.max(...analytics.province_breakdown.map((p) => p.count), 1) : 1
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 w-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -170,18 +172,20 @@ export default function CompanyAnalyticsPage() {
           {/* KPI row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { icon: Users, label: 'Total Responses', value: analytics.total_responses.toLocaleString(), color: 'bg-indigo-500' },
-              { icon: TrendingUp, label: 'Completion Rate', value: `${analytics.completion_rate}%`, color: 'bg-success-600' },
-              { icon: Clock, label: 'Avg. Time', value: `${Math.round(analytics.avg_time_seconds / 60)}m ${analytics.avg_time_seconds % 60}s`, color: 'bg-warning-600' },
-              { icon: CheckCircle2, label: 'Quality (avg)', value: analytics.quality_distribution[0]?.label ?? '—', color: 'bg-primary-600' },
+              { icon: Users, label: 'Total Responses', value: analytics.total_responses.toLocaleString(), color: 'bg-indigo-500', tooltip: 'Total number of completed survey submissions for this survey.' },
+              { icon: TrendingUp, label: 'Completion Rate', value: `${analytics.completion_rate}%`, color: 'bg-success-600', tooltip: 'Percentage of respondents who started and finished the survey. Platform average is ~68%.' },
+              { icon: Clock, label: 'Avg. Time', value: `${Math.round(analytics.avg_time_seconds / 60)}m ${analytics.avg_time_seconds % 60}s`, color: 'bg-warning-600', tooltip: 'Average time respondents spent completing this survey from start to submit.' },
+              { icon: CheckCircle2, label: 'Quality (avg)', value: analytics.quality_distribution[0]?.label ?? '—', color: 'bg-primary-600', tooltip: 'Average quality tier of responses based on engagement, time spent, and answer patterns.' },
             ].map((s) => (
-              <div key={s.label} className="rounded-xl border border-border bg-white p-5">
-                <div className={cn('flex h-9 w-9 items-center justify-center rounded-lg mb-3', s.color)}>
-                  <s.icon className="h-4.5 w-4.5 text-white" />
+              <Tooltip key={s.label} content={s.tooltip} position="bottom">
+                <div className="rounded-xl border border-border bg-white p-5 cursor-default w-full">
+                  <div className={cn('flex h-9 w-9 items-center justify-center rounded-lg mb-3', s.color)}>
+                    <s.icon className="h-4.5 w-4.5 text-white" />
+                  </div>
+                  <p className="text-xl font-bold text-text-primary">{s.value}</p>
+                  <p className="text-xs text-text-secondary mt-0.5">{s.label}</p>
                 </div>
-                <p className="text-xl font-bold text-text-primary">{s.value}</p>
-                <p className="text-xs text-text-secondary mt-0.5">{s.label}</p>
-              </div>
+              </Tooltip>
             ))}
           </div>
 
@@ -212,12 +216,14 @@ export default function CompanyAnalyticsPage() {
                   <div key={i} className="flex items-center gap-3">
                     <span className="text-xs text-text-muted w-4 shrink-0">{i + 1}</span>
                     <span className="text-xs text-text-secondary flex-1 truncate">{d.question}</span>
-                    <div className="w-24 h-2 rounded-full bg-gray-100 overflow-hidden">
-                      <div
-                        className={cn('h-full rounded-full transition-all', i === 0 ? 'bg-success-500' : 'bg-indigo-400')}
-                        style={{ width: `${d.remaining}%` }}
-                      />
-                    </div>
+                    <Tooltip content={i === 0 ? `${d.remaining}% of respondents reached this question — this is the starting baseline.` : `${d.remaining}% of respondents reached this point. ${100 - d.remaining}% dropped off before or at this question.`} position="top">
+                      <div className="w-24 h-2 rounded-full bg-gray-100 overflow-hidden cursor-default">
+                        <div
+                          className={cn('h-full rounded-full transition-all', i === 0 ? 'bg-success-500' : 'bg-indigo-400')}
+                          style={{ width: `${d.remaining}%` }}
+                        />
+                      </div>
+                    </Tooltip>
                     <span className="text-xs font-medium text-text-primary w-8 text-right">{d.remaining}%</span>
                   </div>
                 ))}

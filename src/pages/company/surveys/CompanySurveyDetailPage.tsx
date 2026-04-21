@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Edit2, Pause, Play, Trash2, Users, CheckCircle2, Clock, DollarSign, BarChart2, AlertCircle } from 'lucide-react'
+import { Edit2, Pause, Play, Trash2, Users, CheckCircle2, Clock, DollarSign, BarChart2, AlertCircle, Timer, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/shared/lib'
+import { Breadcrumb, SlidePanel } from '@/shared/ui'
 import { apiClient } from '@/shared/api/client'
 import { ROUTES } from '@/shared/config/routes'
 import { formatDistanceToNow, format } from 'date-fns'
@@ -34,6 +36,159 @@ interface RecentResponse {
   submitted_at: string
 }
 
+interface QualityFactor {
+  name: string
+  passed: boolean
+  penalty: number
+  note: string
+}
+
+interface AnswerDetail {
+  question_number: number
+  question_text: string
+  question_type: string
+  answer: string | string[]
+  time_seconds: number
+  flagged: boolean
+  flag_reason?: string
+}
+
+interface ResponseDetail {
+  id: string
+  respondent_name: string
+  quality_score: number
+  multiplier: number
+  reward_earned: number
+  time_taken_seconds: number
+  quality_factors: QualityFactor[]
+  answers: AnswerDetail[]
+}
+
+function ResponseDetailPanel({ surveyId, responseId }: { surveyId: string; responseId: string }) {
+  const [expandedAnswers, setExpandedAnswers] = useState(true)
+
+  const { data, isLoading } = useQuery<ResponseDetail>({
+    queryKey: ['company', 'surveys', surveyId, 'responses', responseId],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/company/surveys/${surveyId}/responses/${responseId}`)
+      return data as ResponseDetail
+    },
+  })
+
+  if (isLoading) {
+    return (
+      <div className="p-5 space-y-4 animate-pulse">
+        <div className="h-20 bg-gray-100 rounded-xl" />
+        <div className="h-32 bg-gray-100 rounded-xl" />
+        <div className="h-48 bg-gray-100 rounded-xl" />
+      </div>
+    )
+  }
+
+  if (!data) return null
+
+  const scoreColor = data.quality_score >= 80 ? 'text-success-700' : data.quality_score >= 60 ? 'text-yellow-600' : 'text-red-600'
+  const scoreBarColor = data.quality_score >= 80 ? 'bg-success-500' : data.quality_score >= 60 ? 'bg-yellow-400' : 'bg-red-500'
+
+  return (
+    <div className="p-5 space-y-5">
+      {/* Quality score */}
+      <div className="rounded-xl border border-border p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-text-secondary">Quality Score</span>
+          <span className={cn('text-2xl font-bold', scoreColor)}>{data.quality_score}</span>
+        </div>
+        <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
+          <div className={cn('h-full rounded-full transition-all', scoreBarColor)} style={{ width: `${data.quality_score}%` }} />
+        </div>
+        <div className="grid grid-cols-3 gap-3 pt-1">
+          {[
+            { icon: Timer, label: 'Time taken', value: `${Math.round(data.time_taken_seconds / 60)}m ${data.time_taken_seconds % 60}s`, color: 'text-indigo-600 bg-indigo-50' },
+            { icon: BarChart2, label: 'Multiplier', value: `×${data.multiplier.toFixed(1)}`, color: 'text-violet-600 bg-violet-50' },
+            { icon: DollarSign, label: 'Reward', value: `₮${data.reward_earned.toLocaleString()}`, color: 'text-orange-600 bg-orange-50' },
+          ].map(({ icon: Icon, label, value, color }) => (
+            <div key={label} className="rounded-xl border border-border p-3 text-center">
+              <div className={cn('inline-flex h-7 w-7 items-center justify-center rounded-lg mb-1', color)}>
+                <Icon className="h-3.5 w-3.5" />
+              </div>
+              <p className="text-sm font-bold text-text-primary">{value}</p>
+              <p className="text-[11px] text-text-muted mt-0.5">{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Quality factors */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="px-4 py-3 bg-gray-50 border-b border-border">
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">Quality Factors</p>
+        </div>
+        <div className="divide-y divide-border">
+          {data.quality_factors.map((factor) => (
+            <div key={factor.name} className="flex items-start gap-3 px-4 py-3">
+              {factor.passed
+                ? <CheckCircle2 className="h-4 w-4 text-success-600 mt-0.5 shrink-0" />
+                : <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-text-primary">{factor.name}</p>
+                  {!factor.passed && factor.penalty > 0 && (
+                    <span className="text-xs font-semibold text-red-600 shrink-0">−{factor.penalty} pts</span>
+                  )}
+                </div>
+                <p className="text-xs text-text-muted mt-0.5">{factor.note}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Answers */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <button
+          onClick={() => setExpandedAnswers((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-border hover:bg-gray-100 transition-colors"
+        >
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">
+            Answers ({data.answers.length} questions)
+          </p>
+          {expandedAnswers ? <ChevronUp className="h-4 w-4 text-text-muted" /> : <ChevronDown className="h-4 w-4 text-text-muted" />}
+        </button>
+        {expandedAnswers && (
+          <div className="divide-y divide-border">
+            {data.answers.map((a) => (
+              <div key={a.question_number} className="px-4 py-3 space-y-1.5">
+                <div className="flex items-start gap-2">
+                  <span className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-violet-100 text-[10px] font-bold text-violet-700 mt-0.5">
+                    {a.question_number}
+                  </span>
+                  <p className="text-xs font-medium text-text-secondary leading-snug">{a.question_text}</p>
+                </div>
+                <div className="flex items-start gap-1.5 pl-7">
+                  <MessageSquare className="h-3.5 w-3.5 text-text-muted shrink-0 mt-0.5" />
+                  <p className="text-sm text-text-primary">
+                    {Array.isArray(a.answer) ? a.answer.join(', ') : a.answer}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pl-7">
+                  <span className={cn('text-[11px]', a.time_seconds < 3 ? 'text-red-500 font-semibold' : 'text-text-muted')}>
+                    {a.time_seconds}s
+                  </span>
+                  {a.flagged && (
+                    <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-semibold uppercase">
+                      {a.flag_reason ?? 'flagged'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const STATUS_COLOR: Record<string, string> = {
   active: 'bg-success-50 text-success-700 border-success-200',
   paused: 'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -57,6 +212,7 @@ export default function CompanySurveyDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [selectedResponseId, setSelectedResponseId] = useState<string | null>(null)
 
   const { data: survey, isLoading } = useQuery<SurveyDetail>({
     queryKey: ['company', 'surveys', id],
@@ -91,7 +247,7 @@ export default function CompanySurveyDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 max-w-5xl animate-pulse">
+      <div className="space-y-6 w-full animate-pulse">
         <div className="h-8 bg-gray-100 rounded w-64" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 bg-gray-100 rounded-xl" />)}
@@ -106,12 +262,13 @@ export default function CompanySurveyDetailPage() {
   const progressColor = progressPct < 50 ? 'bg-success-500' : progressPct < 80 ? 'bg-yellow-400' : 'bg-red-500'
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 w-full">
       {/* Back + header */}
       <div>
-        <Link to={ROUTES.COMPANY_SURVEYS} className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary mb-3 transition-colors">
-          <ArrowLeft className="h-4 w-4" /> Back to surveys
-        </Link>
+        <Breadcrumb items={[
+          { label: 'Surveys', href: ROUTES.COMPANY_SURVEYS },
+          { label: survey.title },
+        ]} />
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -203,8 +360,9 @@ export default function CompanySurveyDetailPage() {
 
       {/* Recent responses */}
       <div className="rounded-xl border border-border bg-white overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <h2 className="font-semibold text-text-primary">Recent Responses</h2>
+          <p className="text-xs text-text-muted">Click a row to see answers &amp; quality breakdown</p>
         </div>
         {responses.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm text-text-muted">No responses yet</div>
@@ -220,7 +378,11 @@ export default function CompanySurveyDetailPage() {
             </thead>
             <tbody>
               {responses.map((r) => (
-                <tr key={r.id} className="border-b border-border hover:bg-gray-50 transition-colors">
+                <tr
+                  key={r.id}
+                  onClick={() => setSelectedResponseId(r.id)}
+                  className={cn('border-b border-border hover:bg-gray-50 transition-colors cursor-pointer', selectedResponseId === r.id && 'bg-violet-50')}
+                >
                   <td className="px-5 py-3 text-sm font-medium text-text-primary">{r.respondent_name}</td>
                   <td className="px-4 py-3">
                     <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium capitalize',
@@ -248,6 +410,22 @@ export default function CompanySurveyDetailPage() {
           </table>
         )}
       </div>
+
+      {selectedResponseId && (
+        <SlidePanel
+          isOpen={!!selectedResponseId}
+          onClose={() => setSelectedResponseId(null)}
+          title="Response Detail"
+          subtitle={
+            <p className="text-xs text-text-muted">
+              {responses.find((r) => r.id === selectedResponseId)?.respondent_name}
+            </p>
+          }
+          width="w-[520px]"
+        >
+          <ResponseDetailPanel surveyId={id!} responseId={selectedResponseId} />
+        </SlidePanel>
+      )}
     </div>
   )
 }

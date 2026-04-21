@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, FileText, BarChart2, CreditCard, Settings, X, PlusCircle, Building2 } from 'lucide-react'
+import { LayoutDashboard, FileText, BarChart2, CreditCard, Settings, X, PlusCircle, Building2, Bell } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 import { useCompanyAuthStore } from '@/shared/model/companyAuthStore'
 import { ROUTES } from '@/shared/config/routes'
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { to: ROUTES.COMPANY_SURVEYS, icon: FileText, label: 'Surveys' },
   { to: ROUTES.COMPANY_ANALYTICS, icon: BarChart2, label: 'Analytics' },
   { to: ROUTES.COMPANY_BILLING, icon: CreditCard, label: 'Billing & Credits' },
+  { to: ROUTES.COMPANY_NOTIFICATIONS, icon: Bell, label: 'Notifications' },
   { to: ROUTES.COMPANY_SETTINGS, icon: Settings, label: 'Settings' },
 ]
 

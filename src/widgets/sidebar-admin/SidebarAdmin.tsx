@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Building2, Users, FileText, Banknote, AlertTriangle, X, Shield } from 'lucide-react'
+import { LayoutDashboard, Building2, Users, FileText, Banknote, AlertTriangle, X, Shield, Bell, Settings } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 import { useAdminAuthStore } from '@/shared/model/adminAuthStore'
 import { ROUTES } from '@/shared/config/routes'
@@ -9,14 +9,50 @@ interface SidebarProps {
   onClose: () => void
 }
 
-const NAV_ITEMS = [
-  { to: ROUTES.ADMIN_DASHBOARD, icon: LayoutDashboard, label: 'Dashboard' },
-  { to: ROUTES.ADMIN_COMPANIES, icon: Building2, label: 'Companies' },
-  { to: ROUTES.ADMIN_RESPONDENTS, icon: Users, label: 'Respondents' },
-  { to: ROUTES.ADMIN_SURVEYS, icon: FileText, label: 'Surveys' },
-  { to: ROUTES.ADMIN_PAYOUTS, icon: Banknote, label: 'Payouts' },
-  { to: ROUTES.ADMIN_FRAUD, icon: AlertTriangle, label: 'Fraud Queue' },
+const NAV_GROUPS = [
+  {
+    label: null,
+    items: [
+      { to: ROUTES.ADMIN_DASHBOARD, icon: LayoutDashboard, label: 'Dashboard' },
+    ],
+  },
+  {
+    label: 'Users',
+    items: [
+      { to: ROUTES.ADMIN_COMPANIES, icon: Building2, label: 'Companies' },
+      { to: ROUTES.ADMIN_RESPONDENTS, icon: Users, label: 'Respondents' },
+    ],
+  },
+  {
+    label: 'Content',
+    items: [
+      { to: ROUTES.ADMIN_SURVEYS, icon: FileText, label: 'Surveys' },
+    ],
+  },
+  {
+    label: 'Payments',
+    items: [
+      { to: ROUTES.ADMIN_PAYOUTS, icon: Banknote, label: 'Payouts' },
+    ],
+  },
+  {
+    label: 'Moderation',
+    items: [
+      { to: ROUTES.ADMIN_FRAUD, icon: AlertTriangle, label: 'Fraud Queue' },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { to: ROUTES.ADMIN_NOTIFICATIONS, icon: Bell, label: 'Notifications' },
+      { to: ROUTES.ADMIN_SETTINGS, icon: Settings, label: 'Settings' },
+    ],
+  },
 ]
+
+const BADGES: Record<string, { count: number; color: string }> = {
+  [ROUTES.ADMIN_FRAUD]: { count: 3, color: 'bg-red-500' },
+}
 
 export function SidebarAdmin({ isOpen, onClose }: SidebarProps) {
   const user = useAdminAuthStore((s) => s.user)
@@ -66,36 +102,45 @@ export function SidebarAdmin({ isOpen, onClose }: SidebarProps) {
           </div>
         )}
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === ROUTES.ADMIN_DASHBOARD}
-              onClick={onClose}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-violet-800 text-white'
-                    : 'text-violet-300 hover:bg-violet-900 hover:text-white'
-                )
-              }
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {item.label}
-              {item.to === ROUTES.ADMIN_FRAUD && (
-                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                  3
-                </span>
+        {/* Nav groups */}
+        <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
+          {NAV_GROUPS.map((group, gi) => (
+            <div key={gi}>
+              {group.label && (
+                <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-violet-500">
+                  {group.label}
+                </p>
               )}
-              {item.to === ROUTES.ADMIN_COMPANIES && (
-                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500 text-[10px] font-bold text-white">
-                  5
-                </span>
-              )}
-            </NavLink>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const badge = BADGES[item.to]
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.to === ROUTES.ADMIN_DASHBOARD}
+                      onClick={onClose}
+                      className={({ isActive }) =>
+                        cn(
+                          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                          isActive
+                            ? 'bg-violet-800 text-white'
+                            : 'text-violet-300 hover:bg-violet-900 hover:text-white'
+                        )
+                      }
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {item.label}
+                      {badge && (
+                        <span className={cn('ml-auto flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white', badge.color)}>
+                          {badge.count}
+                        </span>
+                      )}
+                    </NavLink>
+                  )
+                })}
+              </div>
+            </div>
           ))}
         </nav>
 

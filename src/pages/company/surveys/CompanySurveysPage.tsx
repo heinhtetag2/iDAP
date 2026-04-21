@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
-import { PlusCircle, Search, MoreVertical, Edit2, Pause, Play, Trash2, Eye, CheckCircle2, PauseCircle, Circle, Clock } from 'lucide-react'
+import { PlusCircle, Search, MoreVertical, Edit2, Pause, Play, Trash2, CheckCircle2, PauseCircle, Circle, Clock } from 'lucide-react'
 import { cn } from '@/shared/lib'
+import { Tooltip } from '@/shared/ui'
 import { apiClient } from '@/shared/api/client'
 import { ROUTES } from '@/shared/config/routes'
 import { formatDistanceToNow } from 'date-fns'
@@ -41,9 +42,18 @@ function SurveyRow({ survey, onAction }: { survey: Survey; onAction: (action: st
       <td className="px-5 py-4">
         <div className="flex items-center gap-3">
           <div className="shrink-0">
-            {survey.status === 'active' && <CheckCircle2 className="h-4 w-4 text-success-600" />}
-            {survey.status === 'paused' && <PauseCircle className="h-4 w-4 text-warning-600" />}
-            {(survey.status === 'completed' || survey.status === 'draft') && <Circle className="h-4 w-4 text-text-muted" />}
+            <Tooltip content={
+              survey.status === 'active' ? 'Active — currently collecting responses.' :
+              survey.status === 'paused' ? 'Paused — temporarily not accepting responses.' :
+              survey.status === 'completed' ? 'Completed — reached maximum responses.' :
+              'Draft — not yet published.'
+            } position="bottom">
+              <span>
+                {survey.status === 'active' && <CheckCircle2 className="h-4 w-4 text-success-600" />}
+                {survey.status === 'paused' && <PauseCircle className="h-4 w-4 text-warning-600" />}
+                {(survey.status === 'completed' || survey.status === 'draft') && <Circle className="h-4 w-4 text-text-muted" />}
+              </span>
+            </Tooltip>
           </div>
           <div>
             <Link to={ROUTES.COMPANY_SURVEY_DETAIL(survey.id)} className="text-sm font-medium text-text-primary hover:text-indigo-600 transition-colors">{survey.title}</Link>
@@ -55,23 +65,27 @@ function SurveyRow({ survey, onAction }: { survey: Survey; onAction: (action: st
         <span className={statusBadgeClass(survey.status)}>{survey.status}</span>
       </td>
       <td className="px-4 py-4">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden w-20">
-            <div className="h-full rounded-full bg-indigo-500" style={{ width: `${pct}%` }} />
+        <Tooltip content={`${survey.current_responses} of ${survey.max_responses} responses collected (${pct}% full).`} position="bottom">
+          <div className="flex items-center gap-2 cursor-default">
+            <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden w-20">
+              <div className="h-full rounded-full bg-indigo-500" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-xs text-text-secondary whitespace-nowrap">
+              {survey.current_responses}/{survey.max_responses}
+            </span>
           </div>
-          <span className="text-xs text-text-secondary whitespace-nowrap">
-            {survey.current_responses}/{survey.max_responses}
-          </span>
-        </div>
+        </Tooltip>
       </td>
       <td className="px-4 py-4 text-sm text-text-primary font-medium">
         ₮{survey.reward_amount.toLocaleString()}
       </td>
       <td className="px-4 py-4 text-sm text-text-secondary">
-        <div className="flex items-center gap-1">
-          <Clock className="h-3 w-3" />
-          {survey.estimated_minutes}m
-        </div>
+        <Tooltip content={`Estimated completion time for respondents: ~${survey.estimated_minutes} minutes.`} position="bottom">
+          <div className="flex items-center gap-1 cursor-default">
+            <Clock className="h-3 w-3" />
+            {survey.estimated_minutes}m
+          </div>
+        </Tooltip>
       </td>
       <td className="px-4 py-4 text-xs text-text-muted">
         {new Date(survey.ends_at) > new Date()
@@ -80,19 +94,14 @@ function SurveyRow({ survey, onAction }: { survey: Survey; onAction: (action: st
       </td>
       <td className="px-4 py-4">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Link
-            to={ROUTES.COMPANY_SURVEY_EDIT(survey.id)}
-            className="p-1.5 rounded hover:bg-gray-200 text-text-muted hover:text-text-primary"
-          >
-            <Edit2 className="h-3.5 w-3.5" />
-          </Link>
-          <Link
-            to={ROUTES.COMPANY_SURVEY_DETAIL(survey.id)}
-            className="p-1.5 rounded hover:bg-gray-200 text-text-muted hover:text-text-primary"
-          >
-            <Eye className="h-3.5 w-3.5" />
-          </Link>
-
+          <Tooltip content="Edit this survey's questions, settings, and reward." position="bottom">
+            <Link
+              to={ROUTES.COMPANY_SURVEY_EDIT(survey.id)}
+              className="p-1.5 rounded hover:bg-gray-200 text-text-muted hover:text-text-primary"
+            >
+              <Edit2 className="h-3.5 w-3.5" />
+            </Link>
+          </Tooltip>
           <div className="relative">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
@@ -155,7 +164,7 @@ export default function CompanySurveysPage() {
   })
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 w-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
